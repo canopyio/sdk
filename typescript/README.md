@@ -1,6 +1,6 @@
 # @canopy-ai/sdk
 
-TypeScript client for [Canopy](https://www.trycanopy.ai) — custodial agent wallets with policy-gated spending.
+TypeScript client for [Canopy](https://www.trycanopy.ai) — org treasury wallets with agent-level policy-gated spending.
 
 ```bash
 npm install @canopy-ai/sdk
@@ -12,7 +12,7 @@ Requires Node.js 18+ (uses the built-in `fetch`). Ships both ESM and CJS builds.
 
 1. **Create an org** at <https://www.trycanopy.ai> — sign up with Clerk, Canopy auto-provisions a treasury wallet and a default spending policy (spend cap, approval threshold).
 2. **Generate an API key**: Dashboard → Settings → API Keys → Create. Copy the `ak_live_…` string (shown once).
-3. **Create an agent**: Dashboard → Agents → Add Agent. You get an `agt_…` id plus a dedicated server wallet for that agent.
+3. **Create an agent**: Dashboard → Agents → Add Agent. You get an `agt_…` id; spend is attributed to that agent and funded by the org treasury.
 4. **Put them in your env**:
    ```bash
    CANOPY_API_KEY=ak_live_xxxxxxxxxxxxxxxx
@@ -185,7 +185,7 @@ const { text } = await generateText({
   model: openai("gpt-4o"),
   tools: {
     canopy_pay: tool({
-      description: "Send a USD payment from the agent's Canopy wallet.",
+      description: "Send a USD payment from the org treasury.",
       parameters: z.object({
         to: z.string(),
         amountUsd: z.number(),
@@ -218,7 +218,7 @@ const canopy = new Canopy({ apiKey: process.env.CANOPY_API_KEY!, agentId: "agt_�
 
 const payTool = createTool({
   id: "canopy_pay",
-  description: "Send a USD payment from the agent's Canopy wallet.",
+  description: "Send a USD payment from the org treasury.",
   inputSchema: z.object({ to: z.string(), amountUsd: z.number() }),
   execute: async ({ context }) =>
     canopy.pay({ to: context.to, amountUsd: context.amountUsd }),
@@ -246,7 +246,7 @@ const msg = await anthropic.messages.create({
   max_tokens: 1024,
   tools: [{
     name: "canopy_pay",
-    description: "Send a USD payment from the agent's Canopy wallet.",
+    description: "Send a USD payment from the org treasury.",
     input_schema: {
       type: "object",
       properties: {
@@ -307,9 +307,9 @@ Use a test-mode key (`ak_test_…`) generated from the local dashboard so produc
 
 ## Chains and tokens
 
-Day 1: USDC on Base mainnet (chain 8453). The SDK hand-builds the `ERC20.transfer(to, amount)` calldata and submits via the agent's Privy server wallet.
+Day 1: USDC on Base mainnet (chain 8453). The SDK hand-builds the `ERC20.transfer(to, amount)` calldata and submits via the org treasury wallet.
 
-The wallet needs a dust balance of ETH to cover gas. Fund the `server_wallet_address` (visible in the dashboard) with ~$0.50 worth of Base ETH once per agent.
+The treasury wallet needs a dust balance of ETH to cover gas. Fund the treasury address shown in the dashboard with ~$0.50 worth of Base ETH.
 
 Support for other chains/tokens will arrive via an expanded `pay()` signature (`chainId`, `token`). The `chainId` arg already exists as a pass-through, but only Base USDC is tested today.
 

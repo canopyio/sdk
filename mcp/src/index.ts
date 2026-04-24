@@ -32,7 +32,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "canopy_pay",
       description:
-        "Send a USD payment from this agent's Canopy wallet. Subject to the agent's spending policy. " +
+        "Send a USD payment from this org treasury. Subject to the agent's spending policy. " +
         "Returns { status: 'allowed' | 'pending_approval' | 'denied', ... }.",
       inputSchema: {
         type: "object",

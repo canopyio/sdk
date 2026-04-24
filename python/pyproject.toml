@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "canopy-ai"
 version = "0.0.1"
-description = "Client library for Canopy — custodial agent wallets with policy-gated spending."
+description = "Client library for Canopy — org treasury wallets with agent-level policy-gated spending."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"

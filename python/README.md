@@ -1,6 +1,6 @@
 # canopy-ai
 
-Python client for [Canopy](https://www.trycanopy.ai) — custodial agent wallets with policy-gated spending.
+Python client for [Canopy](https://www.trycanopy.ai) — org treasury wallets with agent-level policy-gated spending.
 
 ```bash
 pip install canopy-ai
@@ -12,7 +12,7 @@ Requires Python 3.10+. Uses `httpx` for transport.
 
 1. **Create an org** at <https://www.trycanopy.ai> — sign up with Clerk, Canopy auto-provisions a treasury wallet and a default spending policy.
 2. **Generate an API key**: Dashboard → Settings → API Keys → Create. Copy the `ak_live_…` string (shown once).
-3. **Create an agent**: Dashboard → Agents → Add Agent. You get an `agt_…` id plus a dedicated server wallet.
+3. **Create an agent**: Dashboard → Agents → Add Agent. You get an `agt_…` id; spend is attributed to that agent and funded by the org treasury.
 4. **Set env vars**:
    ```bash
    export CANOPY_API_KEY=ak_live_xxxxxxxxxxxxxxxx
@@ -224,7 +224,7 @@ msg = client.messages.create(
     max_tokens=1024,
     tools=[{
         "name": "canopy_pay",
-        "description": "Send a USD payment from the agent's Canopy wallet.",
+        "description": "Send a USD payment from the org treasury.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -258,7 +258,7 @@ def canopy_pay(to: str, amount_usd: float):
 canopy_tool = StructuredTool.from_function(
     func=canopy_pay,
     name="canopy_pay",
-    description="Send a USD payment from the agent's Canopy wallet.",
+    description="Send a USD payment from the org treasury.",
     args_schema=PayArgs,
 )
 ```
@@ -294,7 +294,7 @@ def pay(to: str, amount_usd: float):
 pay_tool = StructuredTool.from_function(
     func=pay,
     name="canopy_pay",
-    description="Send a USD payment from the agent's Canopy wallet.",
+    description="Send a USD payment from the org treasury.",
     args_schema=PayArgs,
 )
 
@@ -325,7 +325,7 @@ canopy = Canopy(
 
 @function_tool
 def canopy_pay(to: str, amount_usd: float):
-    """Send a USD payment from the agent's Canopy wallet."""
+    """Send a USD payment from the org treasury."""
     return canopy.pay(to=to, amount_usd=amount_usd)
 
 agent = Agent(
@@ -378,9 +378,9 @@ Use a test-mode key (`ak_test_...`) so prod data stays clean.
 
 ## Chains and tokens
 
-Day 1: USDC on Base mainnet (chain 8453). The SDK hand-builds `ERC20.transfer(to, amount)` calldata and submits via the agent's Privy server wallet.
+Day 1: USDC on Base mainnet (chain 8453). The SDK hand-builds `ERC20.transfer(to, amount)` calldata and submits via the org treasury wallet.
 
-The wallet needs a tiny ETH balance for gas (~$0.50 of Base ETH is plenty for hundreds of txs). Fund once per agent via the `server_wallet_address` shown in the dashboard.
+The treasury wallet needs a tiny ETH balance for gas (~$0.50 of Base ETH is plenty for hundreds of txs). Fund the treasury address shown in the dashboard.
 
 Other chains / tokens: the `chain_id` arg is passed through but only Base USDC is tested today.
 

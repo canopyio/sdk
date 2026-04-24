@@ -1,8 +1,8 @@
 # Canopy SDK
 
-Client libraries for [Canopy](https://www.trycanopy.ai) — custodial agent wallets with policy-gated spending.
+Client libraries for [Canopy](https://www.trycanopy.ai) — org treasury wallets with agent-level policy-gated spending.
 
-Canopy lets you give an AI agent a real wallet without handing it a private key. The agent calls `canopy.pay({ to, amountUsd })`; Canopy evaluates your org's spending policy (cap, allowlist, approval threshold), and — if allowed — signs and submits the transaction from a Privy-backed server wallet that Canopy manages on your agent's behalf.
+Canopy lets an AI agent transact from your org treasury without handing it a private key. The agent calls `canopy.pay({ to, amountUsd })`; Canopy evaluates that agent's spending policy (cap, allowlist, approval threshold), and — if allowed — signs and submits the transaction from the Privy-backed org treasury wallet.
 
 ## The three packages
 
@@ -48,7 +48,7 @@ You need three things:
 
 1. **An org on [trycanopy.ai](https://www.trycanopy.ai)**. Sign up, Canopy auto-provisions a treasury wallet and a default spending policy for you.
 2. **An API key**. Dashboard → Settings → API Keys → Create. You'll see `ak_live_…` exactly once — copy it into `CANOPY_API_KEY`.
-3. **An agent**. Dashboard → Agents → Add Agent. Canopy mints a per-agent server wallet, registers it as a co-signer on your treasury, and gives you an `agt_…` id.
+3. **An agent**. Dashboard → Agents → Add Agent. Canopy gives you an `agt_…` id so policy and activity can be attributed to that agent while funds come from the org treasury.
 
 After that, the SDK just needs `CANOPY_API_KEY` and the agent id.
 
@@ -71,12 +71,12 @@ The package-specific READMEs document each in detail.
 1. **SDK → Canopy API**: `POST /api/sign` with your API key, agent id, recipient, amount.
 2. **Canopy evaluates**: atomic SQL function runs the allowlist check, cap check (with advisory lock so concurrent signs can't race past the cap), and approval-threshold check.
 3. **Three outcomes**:
-   - `allowed` → Canopy submits the tx from the agent's Privy server wallet. Returns `txHash`.
+   - `allowed` → Canopy submits the tx from the org treasury wallet. Returns `txHash`.
    - `pending_approval` → Canopy creates an `approval_request`. An org admin decides in the dashboard. Agent can `waitForApproval(id)`.
    - `denied` → Rejection logged. Agent sees the reason.
 4. **Idempotent**: pass an `idempotencyKey` / `idempotency_key` and a retry returns the cached decision — no double charge.
 
-You never see a private key. Signing happens server-side against a Privy-managed wallet that only Canopy can co-sign, gated by your policy.
+You never see a private key. Signing happens server-side against the Privy-managed org treasury wallet, gated by your policy and attributed to the calling agent.
 
 ## Entity registry
 

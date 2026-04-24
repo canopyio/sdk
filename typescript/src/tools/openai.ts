@@ -15,7 +15,7 @@ export function openaiTools(canopy: Canopy) {
       function: {
         name: "canopy_pay",
         description:
-          "Send a USD payment from this agent's Canopy wallet. Subject to the agent's spending policy. " +
+          "Send a USD payment from the org treasury. Subject to this agent's spending policy. " +
           "May return `pending_approval` if the amount exceeds the approval threshold.",
         parameters: {
           type: "object",

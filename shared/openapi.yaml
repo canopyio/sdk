@@ -151,7 +151,7 @@ paths:
       description: |
         Evaluates the policy atomically (allowlist, cap, approval threshold),
         persists the transaction record, and if allowed submits it via the
-        agent's Privy server wallet. Idempotent when an
+        org treasury wallet. Idempotent when an
         `Idempotency-Key` header is provided — a repeat call with the same
         (agent_id, idempotency_key) returns the cached decision.
       parameters:

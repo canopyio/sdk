@@ -69,7 +69,7 @@ Two tools, one simple surface:
 
 ### `canopy_pay`
 
-Send a USD payment from the agent's Canopy wallet. Subject to the org's spending policy.
+Send a USD payment from the org treasury. Subject to the org's spending policy.
 
 **Arguments**
 ```json

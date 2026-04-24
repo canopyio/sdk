@@ -22,7 +22,7 @@ def openai_tools(canopy: "Canopy") -> list[dict[str, Any]]:
             "function": {
                 "name": "canopy_pay",
                 "description": (
-                    "Send a USD payment from this agent's Canopy wallet. "
+                    "Send a USD payment from the org treasury. "
                     "Subject to the agent's spending policy. "
                     "May return pending_approval if the amount exceeds the approval threshold."
                 ),
