@@ -1,0 +1,44 @@
+{
+  "name": "preview_allowed",
+  "description": "canopy.preview() sends dry_run=true and returns the evaluation without persisting or signing.",
+  "config": {
+    "apiKey": "ak_live_test",
+    "agentId": "agt_test",
+    "baseUrl": "https://api.canopy.test"
+  },
+  "call": {
+    "method": "preview",
+    "args": { "to": "0x7777777777777777777777777777777777777777", "amountUsd": 0.1 }
+  },
+  "httpExchange": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.canopy.test/api/sign",
+        "bodyMatches": {
+          "agent_id": "agt_test",
+          "amount_usd": 0.1,
+          "dry_run": true
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "signature": null,
+          "tx_hash": null,
+          "agent_id": "agt_test",
+          "cost_usd": "$0.1000",
+          "transaction_id": null,
+          "dry_run": true
+        }
+      }
+    }
+  ],
+  "expectedReturn": {
+    "status": "allowed",
+    "txHash": null,
+    "transactionId": null,
+    "costUsd": 0.1,
+    "dryRun": true
+  }
+}

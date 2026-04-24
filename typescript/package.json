@@ -1,0 +1,59 @@
+{
+  "name": "@canopy-ai/sdk",
+  "version": "0.0.1",
+  "description": "Client library for Canopy — custodial agent wallets with policy-gated spending.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/canopyio/sdk.git",
+    "directory": "typescript"
+  },
+  "homepage": "https://github.com/canopyio/sdk/tree/main/typescript",
+  "bugs": {
+    "url": "https://github.com/canopyio/sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "canopy",
+    "agent",
+    "wallet",
+    "x402",
+    "ai",
+    "llm"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

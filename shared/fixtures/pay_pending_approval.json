@@ -1,0 +1,40 @@
+{
+  "name": "pay_pending_approval",
+  "description": "Amount is over the approval threshold but under the cap. Server returns 202 with an approval request; SDK returns pending_approval without blocking.",
+  "config": {
+    "apiKey": "ak_live_test",
+    "agentId": "agt_test",
+    "baseUrl": "https://api.canopy.test"
+  },
+  "call": {
+    "method": "pay",
+    "args": { "to": "0x3333333333333333333333333333333333333333", "amountUsd": 7.5 }
+  },
+  "httpExchange": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.canopy.test/api/sign",
+        "bodyMatches": {
+          "agent_id": "agt_test",
+          "amount_usd": 7.5
+        }
+      },
+      "response": {
+        "status": 202,
+        "body": {
+          "status": "pending_approval",
+          "reason": "Amount $7.50 exceeds approval threshold of $5",
+          "transaction_id": "33333333-3333-3333-3333-333333333333",
+          "approval_request_id": "44444444-4444-4444-4444-444444444444"
+        }
+      }
+    }
+  ],
+  "expectedReturn": {
+    "status": "pending_approval",
+    "reason": "Amount $7.50 exceeds approval threshold of $5",
+    "transactionId": "33333333-3333-3333-3333-333333333333",
+    "approvalId": "44444444-4444-4444-4444-444444444444"
+  }
+}

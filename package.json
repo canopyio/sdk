@@ -1,0 +1,21 @@
+{
+  "name": "canopy-ai-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Monorepo for @canopy-ai/sdk, @canopy-ai/mcp.",
+  "workspaces": [
+    "typescript",
+    "mcp"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "npm run build --workspaces && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.0"
+  }
+}

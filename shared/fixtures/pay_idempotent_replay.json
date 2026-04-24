@@ -1,0 +1,48 @@
+{
+  "name": "pay_idempotent_replay",
+  "description": "Second pay() with the same idempotencyKey returns the cached allowed result with idempotent=true.",
+  "config": {
+    "apiKey": "ak_live_test",
+    "agentId": "agt_test",
+    "baseUrl": "https://api.canopy.test"
+  },
+  "call": {
+    "method": "pay",
+    "args": {
+      "to": "0x5555555555555555555555555555555555555555",
+      "amountUsd": 0.25,
+      "idempotencyKey": "order-42"
+    }
+  },
+  "httpExchange": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.canopy.test/api/sign",
+        "headers": { "idempotency-key": "order-42" },
+        "bodyMatches": {
+          "agent_id": "agt_test",
+          "amount_usd": 0.25
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "signature": null,
+          "tx_hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "agent_id": "agt_test",
+          "cost_usd": "$0.2500",
+          "transaction_id": "55555555-5555-5555-5555-555555555555",
+          "idempotent": true
+        }
+      }
+    }
+  ],
+  "expectedReturn": {
+    "status": "allowed",
+    "txHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "transactionId": "55555555-5555-5555-5555-555555555555",
+    "costUsd": 0.25,
+    "idempotent": true
+  }
+}

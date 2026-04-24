@@ -1,0 +1,38 @@
+{
+  "name": "pay_denied_cap",
+  "description": "Policy denies because the spend cap would be exceeded. SDK returns a denied result, does not throw.",
+  "config": {
+    "apiKey": "ak_live_test",
+    "agentId": "agt_test",
+    "baseUrl": "https://api.canopy.test"
+  },
+  "call": {
+    "method": "pay",
+    "args": { "to": "0x2222222222222222222222222222222222222222", "amountUsd": 999 }
+  },
+  "httpExchange": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.canopy.test/api/sign",
+        "bodyMatches": {
+          "agent_id": "agt_test",
+          "amount_usd": 999
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "error": "Policy denied",
+          "reason": "Spend cap exceeded: $0.00 + $999.00 > $10 / 24h",
+          "transaction_id": "22222222-2222-2222-2222-222222222222"
+        }
+      }
+    }
+  ],
+  "expectedReturn": {
+    "status": "denied",
+    "reason": "Spend cap exceeded: $0.00 + $999.00 > $10 / 24h",
+    "transactionId": "22222222-2222-2222-2222-222222222222"
+  }
+}

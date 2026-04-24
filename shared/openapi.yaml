@@ -1,0 +1,255 @@
+openapi: 3.1.0
+info:
+  title: Canopy SDK API
+  version: 0.1.0
+  description: |
+    HTTP contract consumed by the Canopy SDKs (TS, Python, MCP).
+    Only documents the endpoints an SDK actually calls — dashboard/webhook
+    routes on canopy-app are out of scope.
+
+servers:
+  - url: https://www.trycanopy.ai
+    description: Production
+  - url: http://localhost:3000
+    description: Local dev (canopy-app on port 3000)
+
+security:
+  - apiKey: []
+
+components:
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      bearerFormat: ak_live_... or ak_test_...
+
+  schemas:
+    SignRequest:
+      type: object
+      required: [agent_id]
+      properties:
+        agent_id:
+          type: string
+          example: agt_xxxxxxxx
+        type:
+          type: string
+          enum: [eip3009, permit2, raw_transaction]
+          default: raw_transaction
+        chain_id:
+          type: integer
+          default: 8453
+          description: Base mainnet by default
+        recipient_address:
+          type: string
+          description: Final on-chain recipient (after entity registry resolution)
+        amount_usd:
+          type: number
+          description: USD amount, used by the policy engine
+        payload:
+          type: object
+          description: Wire-level payload. Shape depends on `type`.
+        dry_run:
+          type: boolean
+          default: false
+          description: Evaluate policy and return the decision without signing or persisting.
+
+    SignResponseAllowed:
+      type: object
+      required: [transaction_id, agent_id]
+      properties:
+        signature:
+          type: string
+          nullable: true
+        tx_hash:
+          type: string
+          nullable: true
+        agent_id:
+          type: string
+        cost_usd:
+          type: string
+          nullable: true
+        transaction_id:
+          type: string
+          format: uuid
+        idempotent:
+          type: boolean
+          default: false
+
+    SignResponseDenied:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: Policy denied
+        reason:
+          type: string
+        transaction_id:
+          type: string
+          format: uuid
+
+    SignResponsePending:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [pending_approval]
+        reason:
+          type: string
+        transaction_id:
+          type: string
+          format: uuid
+        approval_request_id:
+          type: string
+          format: uuid
+
+    PingResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        agent_id:
+          type: string
+        agent_name:
+          type: string
+        org_id:
+          type: string
+        status:
+          type: string
+
+    ApprovalStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [pending, approved, denied, expired]
+        decided_at:
+          type: string
+          format: date-time
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+        transaction_id:
+          type: string
+          format: uuid
+
+    ResolveResponse:
+      type: object
+      properties:
+        address:
+          type: string
+        entity:
+          type: object
+
+paths:
+  /api/sign:
+    post:
+      summary: Policy-gated signing request
+      description: |
+        Evaluates the policy atomically (allowlist, cap, approval threshold),
+        persists the transaction record, and if allowed submits it via the
+        agent's Privy server wallet. Idempotent when an
+        `Idempotency-Key` header is provided — a repeat call with the same
+        (agent_id, idempotency_key) returns the cached decision.
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignRequest'
+      responses:
+        '200':
+          description: Allowed — signed and (if applicable) submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignResponseAllowed'
+        '202':
+          description: Pending human approval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignResponsePending'
+        '403':
+          description: Policy denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignResponseDenied'
+        '401':
+          description: Invalid API key
+        '503':
+          description: Privy not configured on the server
+
+  /api/ping:
+    post:
+      summary: Connectivity + auto-register agent
+      description: Logs a zero-amount transaction so the dashboard can detect "agent connected".
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent_id]
+              properties:
+                agent_id:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PingResponse'
+
+  /api/approvals/{id}/status:
+    get:
+      summary: Poll an approval request's current status
+      description: |
+        Used by canopy.waitForApproval. API-key scoped — must belong to the
+        same org as the approval's agent.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalStatus'
+        '404':
+          description: Not found or cross-org
+
+  /api/resolve:
+    get:
+      summary: Entity registry lookup
+      description: Public lookup, no auth. Resolves a registry slug like `agentic.market/anthropic` to an address.
+      security: []
+      parameters:
+        - in: query
+          name: entity
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Resolved entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveResponse'

@@ -1,0 +1,48 @@
+{
+  "name": "pay_allowed_usdc",
+  "description": "Happy path: explicit address, amount under cap and threshold, allowed and submitted.",
+  "config": {
+    "apiKey": "ak_live_test",
+    "agentId": "agt_test",
+    "baseUrl": "https://api.canopy.test"
+  },
+  "call": {
+    "method": "pay",
+    "args": { "to": "0x1111111111111111111111111111111111111111", "amountUsd": 0.1 }
+  },
+  "httpExchange": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.canopy.test/api/sign",
+        "headers": {
+          "authorization": "Bearer ak_live_test",
+          "content-type": "application/json"
+        },
+        "bodyMatches": {
+          "agent_id": "agt_test",
+          "type": "raw_transaction",
+          "chain_id": 8453,
+          "recipient_address": "0x1111111111111111111111111111111111111111",
+          "amount_usd": 0.1
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "signature": null,
+          "tx_hash": "0xabc1230000000000000000000000000000000000000000000000000000000000",
+          "agent_id": "agt_test",
+          "cost_usd": "$0.1000",
+          "transaction_id": "11111111-1111-1111-1111-111111111111"
+        }
+      }
+    }
+  ],
+  "expectedReturn": {
+    "status": "allowed",
+    "txHash": "0xabc1230000000000000000000000000000000000000000000000000000000000",
+    "transactionId": "11111111-1111-1111-1111-111111111111",
+    "costUsd": 0.1
+  }
+}
