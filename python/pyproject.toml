@@ -30,6 +30,7 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-httpx>=0.30",
+    "pytest-asyncio>=0.23",
     "ruff>=0.5",
     "mypy>=1.8",
 ]
@@ -44,6 +45,7 @@ packages = ["canopy_ai"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100

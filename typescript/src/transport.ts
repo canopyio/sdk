@@ -1,4 +1,12 @@
 import { CanopyApiError, CanopyNetworkError } from "./errors.js";
+import { agentsUrl, apiKeysUrl } from "./dashboard-urls.js";
+
+const SDK_VERSION = "0.0.1";
+const RUNTIME_BANNER = (() => {
+  const v = typeof process !== "undefined" ? process.versions?.node : undefined;
+  return v ? `node/${v.split(".")[0]}` : "unknown";
+})();
+const USER_AGENT = `@canopy-ai/sdk/${SDK_VERSION} ${RUNTIME_BANNER}`;
 
 interface RequestOptions {
   method: "GET" | "POST";
@@ -29,6 +37,7 @@ export class Transport {
     const url = this.baseUrl.replace(/\/$/, "") + opts.path;
     const headers: Record<string, string> = {
       authorization: `Bearer ${this.apiKey}`,
+      "user-agent": USER_AGENT,
       ...(opts.headers ?? {}),
     };
     if (opts.body !== undefined) headers["content-type"] = "application/json";
@@ -62,13 +71,23 @@ export class Transport {
 
     const allowed = opts.expectStatuses ?? [200];
     if (!allowed.includes(res.status)) {
-      const message =
-        (parsed && typeof parsed === "object" && "error" in parsed
+      const apiMessage =
+        parsed && typeof parsed === "object" && "error" in parsed
           ? String((parsed as { error: unknown }).error)
-          : null) ?? `Canopy API returned ${res.status}`;
-      throw new CanopyApiError(res.status, message, parsed);
+          : null;
+      const dashboardUrl = this.dashboardUrlFor(res.status, opts.path);
+      const baseMessage = apiMessage ?? `Canopy API returned ${res.status}`;
+      const message = dashboardUrl ? `${baseMessage}. See ${dashboardUrl}` : baseMessage;
+      throw new CanopyApiError(res.status, message, parsed, dashboardUrl);
     }
 
     return { status: res.status, body: parsed as T };
+  }
+
+  private dashboardUrlFor(status: number, path: string): string | undefined {
+    if (status === 401) return apiKeysUrl(this.baseUrl);
+    if (status === 403) return apiKeysUrl(this.baseUrl);
+    if (status === 404 && path.includes("/agents")) return agentsUrl(this.baseUrl);
+    return undefined;
   }
 }

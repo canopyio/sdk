@@ -65,7 +65,7 @@ Any MCP host with a `mcpServers` config block will work with the same shape — 
 
 ## Available tools
 
-Two tools, one simple surface:
+Four tools covering the full payment lifecycle:
 
 ### `canopy_pay`
 
@@ -101,6 +101,36 @@ Other outcomes the LLM needs to reason about:
 Dry-run the same policy evaluation without signing or charging. Useful when the LLM wants to ask "would this payment go through?" before committing.
 
 Same argument shape as `canopy_pay`. Returns a `PayResult` with `"dryRun": true`.
+
+### `canopy_get_approval_status`
+
+Poll the current state of an approval request. Use this after `canopy_pay` returns `pending_approval` to find out whether the org admin has decided.
+
+**Arguments**
+```json
+{ "approvalId": "appr_..." }
+```
+
+**Returns**
+```json
+{
+  "status": "pending" | "approved" | "denied" | "expired",
+  "decidedAt": "2026-04-27T10:32:11Z" | null,
+  "expiresAt": "2026-04-27T10:45:00Z",
+  "transactionId": "..."
+}
+```
+
+### `canopy_wait_for_approval`
+
+Block until an approval is decided, or up to 60 seconds. Useful when the user is expected to decide promptly in the dashboard. For longer waits, poll `canopy_get_approval_status`.
+
+**Arguments**
+```json
+{ "approvalId": "appr_...", "timeoutMs": 30000 }
+```
+
+`timeoutMs` is optional and capped at `60000` regardless of caller input — long timeouts would hold the MCP transport. Returns the same shape as `canopy_get_approval_status`.
 
 ## How the LLM experiences it
 
@@ -147,11 +177,11 @@ Use a test-mode key (`ak_test_…`) so you don't pollute production data.
 
 **`canopy_pay` returns `denied` with "Spend cap exceeded"** — the agent has spent its cap in the current window. Wait it out or raise the cap in the dashboard.
 
-**`canopy_pay` returns `pending_approval` and just hangs** — MCP tools return synchronously and we don't poll. Open the dashboard, decide the approval, then ask the LLM to retry — it'll pick up the allowed result via idempotency on the same call.
+**`canopy_pay` returns `pending_approval`** — call `canopy_wait_for_approval({ approvalId })` to block up to 60 seconds for a decision, or `canopy_get_approval_status({ approvalId })` to poll on your own cadence. If the user takes longer than a minute, ask them to decide in the dashboard, then re-call `canopy_pay` with the same arguments — idempotency returns the cached `allowed` result without re-charging.
 
 ## What's under the hood
 
-`@canopy-ai/mcp` is a thin wrapper around [`@canopy-ai/sdk`](../typescript). It's an stdio MCP server (the official `@modelcontextprotocol/sdk`) that exposes `canopy.pay` and `canopy.preview` as MCP tools. No custody — the server just proxies to Canopy's API with your key.
+`@canopy-ai/mcp` is a thin wrapper around [`@canopy-ai/sdk`](../typescript). It's an stdio MCP server (the official `@modelcontextprotocol/sdk`) that exposes `canopy.pay`, `canopy.preview`, `canopy.getApprovalStatus`, and `canopy.waitForApproval` as MCP tools. No custody — the server just proxies to Canopy's API with your key.
 
 ## Version
 

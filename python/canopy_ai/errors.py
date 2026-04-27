@@ -6,10 +6,19 @@ class CanopyError(Exception):
 
 
 class CanopyApiError(CanopyError):
-    def __init__(self, status: int, message: str, body: Any = None) -> None:
+    def __init__(
+        self,
+        status: int,
+        message: str,
+        body: Any = None,
+        *,
+        dashboard_url: str | None = None,
+    ) -> None:
         super().__init__(message)
         self.status = status
         self.body = body
+        #: Dashboard URL the developer should open to fix this, if known.
+        self.dashboard_url = dashboard_url
 
 
 class CanopyNetworkError(CanopyError):
@@ -19,7 +28,10 @@ class CanopyNetworkError(CanopyError):
 
 
 class CanopyConfigError(CanopyError):
-    pass
+    def __init__(self, message: str, *, dashboard_url: str | None = None) -> None:
+        super().__init__(message)
+        #: Dashboard URL the developer should open to fix this, if known.
+        self.dashboard_url = dashboard_url
 
 
 class CanopyApprovalTimeoutError(CanopyError):

@@ -54,3 +54,37 @@ export interface WaitForApprovalOptions {
 }
 
 export type ToolFramework = "openai" | "anthropic" | "vercel" | "langchain";
+
+export interface BudgetSnapshot {
+  agentId: string;
+  /** Spend cap in USD, or `null` if the agent has no policy bound. */
+  capUsd: number | null;
+  /** USD spent in the current cap window. */
+  spentUsd: number;
+  /** Remaining USD in the current window, or `null` if there's no cap. */
+  remainingUsd: number | null;
+  /** Cap window in hours (default 24). */
+  periodHours: number;
+  /**
+   * Timestamp when the oldest spend in the current window ages out (so the
+   * agent regains some headroom). `null` if nothing has been spent yet.
+   */
+  periodResetsAt: string | null;
+}
+
+export interface PingResult {
+  ok: true;
+  agent: {
+    id: string;
+    name: string | null;
+    status: string;
+    policyId: string | null;
+    policyName: string | null;
+  };
+  org: {
+    name: string | null;
+    treasuryAddress: string;
+  };
+  /** Round-trip latency in milliseconds, observed by the SDK. */
+  latencyMs: number;
+}

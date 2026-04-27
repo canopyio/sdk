@@ -1,3 +1,4 @@
+from canopy_ai.async_client import AsyncCanopy
 from canopy_ai.client import Canopy
 from canopy_ai.errors import (
     CanopyApiError,
@@ -8,14 +9,17 @@ from canopy_ai.errors import (
 )
 from canopy_ai.types import (
     ApprovalStatus,
+    BudgetSnapshot,
     PayResult,
     PayResultAllowed,
     PayResultDenied,
     PayResultPending,
+    PingResult,
 )
 
 __all__ = [
     "Canopy",
+    "AsyncCanopy",
     "CanopyError",
     "CanopyApiError",
     "CanopyNetworkError",
@@ -26,4 +30,6 @@ __all__ = [
     "PayResultDenied",
     "PayResultPending",
     "ApprovalStatus",
+    "PingResult",
+    "BudgetSnapshot",
 ]

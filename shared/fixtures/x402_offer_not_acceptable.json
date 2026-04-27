@@ -1,0 +1,40 @@
+{
+  "name": "x402_offer_not_acceptable",
+  "description": "402 response with no `exact`/`base` offer in `accepts`: SDK should not call /api/sign; the original 402 is returned to the caller unchanged.",
+  "config": {
+    "apiKey": "ak_live_test",
+    "agentId": "agt_test",
+    "baseUrl": "https://api.canopy.test"
+  },
+  "call": {
+    "method": "fetch",
+    "args": { "url": "https://paywalled.example.com/api/data" }
+  },
+  "httpExchange": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://paywalled.example.com/api/data"
+      },
+      "response": {
+        "status": 402,
+        "body": {
+          "x402Version": 1,
+          "accepts": [
+            {
+              "scheme": "permit",
+              "network": "ethereum",
+              "maxAmountRequired": "100000",
+              "resource": "https://paywalled.example.com/api/data",
+              "payTo": "0x2222222222222222222222222222222222222222",
+              "asset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expectedFetch": {
+    "status": 402
+  }
+}

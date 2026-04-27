@@ -1,14 +1,16 @@
+import time
 from typing import Any, Literal
 
 import httpx
 
 from canopy_ai.approval import get_approval_status, wait_for_approval
+from canopy_ai.dashboard_urls import agents_url, api_keys_url
 from canopy_ai.encoding import USDC_BASE, encode_erc20_transfer, is_entity_slug, usd_to_usdc_units
 from canopy_ai.errors import CanopyConfigError
 from canopy_ai.fetch import canopy_fetch
 from canopy_ai.resolve import resolve_entity
 from canopy_ai.transport import Transport
-from canopy_ai.types import ApprovalStatus, PayResult
+from canopy_ai.types import ApprovalStatus, BudgetSnapshot, PayResult, PingResult
 
 _DEFAULT_BASE_URL = "https://www.trycanopy.ai"
 _DEFAULT_CHAIN_ID = 8453
@@ -25,10 +27,15 @@ class Canopy:
         base_url: str | None = None,
         http_client: httpx.Client | None = None,
     ) -> None:
+        resolved_base = (base_url or _DEFAULT_BASE_URL).rstrip("/")
         if not api_key:
-            raise CanopyConfigError("api_key is required")
+            url = api_keys_url(resolved_base)
+            raise CanopyConfigError(
+                f"api_key is required. Create one at {url}",
+                dashboard_url=url,
+            )
         self.agent_id = agent_id
-        self._base_url = (base_url or _DEFAULT_BASE_URL).rstrip("/")
+        self._base_url = resolved_base
         self._transport = Transport(self._base_url, api_key, client=http_client)
 
     def pay(
@@ -73,9 +80,11 @@ class Canopy:
         dry_run: bool,
     ) -> PayResult:
         if not self.agent_id:
+            url = agents_url(self._base_url)
             raise CanopyConfigError(
                 "agent_id is required for pay()/preview(). "
-                "Pass it to the Canopy constructor."
+                f"Pass it to the Canopy constructor. Create or find an agent at {url}",
+                dashboard_url=url,
             )
 
         recipient = (
@@ -175,12 +184,68 @@ class Canopy:
             method=method,
             headers=headers,
             content=content,
+            http_client=self._transport.client,
         )
 
     def get_tools(self, *, framework: ToolFramework) -> Any:
         from canopy_ai.integrations import get_tools_for
 
         return get_tools_for(self, framework)
+
+    def budget(self) -> BudgetSnapshot:
+        """
+        Pre-flight cap snapshot for the current agent. Useful for LLM
+        planning: "I have $4.30 left this window — defer the expensive call."
+        Returns ``cap_usd: None`` and ``remaining_usd: None`` when no policy
+        is bound to the agent.
+        """
+        if not self.agent_id:
+            url = agents_url(self._base_url)
+            raise CanopyConfigError(
+                "agent_id is required for budget(). "
+                f"Pass it to the Canopy constructor. Create or find an agent at {url}",
+                dashboard_url=url,
+            )
+        from urllib.parse import quote
+
+        _, body = self._transport.request(
+            "GET",
+            f"/api/agents/{quote(self.agent_id, safe='')}/budget",
+            expect_statuses=[200],
+        )
+        assert isinstance(body, dict)
+        return {
+            "agent_id": body["agent_id"],
+            "cap_usd": body.get("cap_usd"),
+            "spent_usd": float(body.get("spent_usd", 0)),
+            "remaining_usd": body.get("remaining_usd"),
+            "period_hours": int(body.get("period_hours", 24)),
+            "period_resets_at": body.get("period_resets_at"),
+        }
+
+    def ping(self) -> PingResult:
+        """
+        Verify the API key + agent are configured correctly. Use on app
+        startup as a fail-fast health check. The dashboard reacts in real
+        time when this lands, so it's also the moment the developer sees
+        their agent flip from "Never connected" to "Connected".
+        """
+        if not self.agent_id:
+            url = agents_url(self._base_url)
+            raise CanopyConfigError(
+                "agent_id is required for ping(). "
+                f"Pass it to the Canopy constructor. Create or find an agent at {url}",
+                dashboard_url=url,
+            )
+        start = time.monotonic()
+        _, body = self._transport.request(
+            "POST",
+            "/api/ping",
+            json={"agent_id": self.agent_id},
+            expect_statuses=[200],
+        )
+        latency_ms = int((time.monotonic() - start) * 1000)
+        return _map_ping_response(body, latency_ms)
 
 
 def _parse_cost_usd(raw: Any) -> float | None:
@@ -190,3 +255,29 @@ def _parse_cost_usd(raw: Any) -> float | None:
         return float(str(raw).lstrip("$"))
     except ValueError:
         return None
+
+
+def _map_ping_response(body: Any, latency_ms: int) -> PingResult:
+    """Map /api/ping JSON to a PingResult. Prefers the structured
+    ``agent`` / ``org`` fields; falls back to the legacy flat fields so this
+    SDK still works against older canopy-app deployments."""
+    assert isinstance(body, dict)
+    raw_agent = body.get("agent")
+    agent_obj: dict[str, Any] = raw_agent if isinstance(raw_agent, dict) else {}
+    raw_org = body.get("org")
+    org_obj: dict[str, Any] = raw_org if isinstance(raw_org, dict) else {}
+    return {
+        "ok": True,
+        "agent": {
+            "id": agent_obj.get("id") or body.get("agent_id") or "",
+            "name": agent_obj.get("name") if "name" in agent_obj else body.get("agent_name"),
+            "status": agent_obj.get("status") or body.get("status") or "unknown",
+            "policy_id": agent_obj.get("policy_id"),
+            "policy_name": agent_obj.get("policy_name"),
+        },
+        "org": {
+            "name": org_obj.get("name"),
+            "treasury_address": org_obj.get("treasury_address") or "",
+        },
+        "latency_ms": latency_ms,
+    }

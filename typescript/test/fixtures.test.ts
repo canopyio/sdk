@@ -7,7 +7,9 @@ interface Fixture {
   name: string;
   description: string;
   config: { apiKey: string; agentId?: string; baseUrl: string };
-  call: { method: "pay" | "preview"; args: Record<string, unknown> };
+  call:
+    | { method: "pay" | "preview"; args: Record<string, unknown> }
+    | { method: "fetch"; args: { url: string; init?: { method?: string; body?: string } } };
   httpExchange: Array<{
     request: {
       method: string;
@@ -17,10 +19,13 @@ interface Fixture {
     };
     response: {
       status: number;
+      headers?: Record<string, string>;
       body: unknown;
     };
   }>;
-  expectedReturn: Record<string, unknown>;
+  expectedReturn?: Record<string, unknown>;
+  expectedFetch?: { status: number; bodyEquals?: unknown; headersInclude?: Record<string, string> };
+  expectedThrow?: { name: string; messageIncludes?: string };
 }
 
 function loadFixtures(): Fixture[] {
@@ -127,26 +132,69 @@ describe("fixture replay", () => {
           if (err) throw new Error(`Body mismatch: ${err}`);
         }
 
+        const respHeaders: Record<string, string> = {
+          "content-type": "application/json",
+          ...(exchange.response.headers ?? {}),
+        };
         return new Response(JSON.stringify(exchange.response.body), {
           status: exchange.response.status,
-          headers: { "content-type": "application/json" },
+          headers: respHeaders,
         });
       }) as typeof fetch;
 
       const canopy = new Canopy(fixture.config);
-      let result: unknown;
-      if (fixture.call.method === "pay") {
-        result = await canopy.pay(fixture.call.args as Parameters<typeof canopy.pay>[0]);
-      } else if (fixture.call.method === "preview") {
-        result = await canopy.preview(fixture.call.args as Parameters<typeof canopy.preview>[0]);
-      } else {
-        throw new Error(`Fixture ${fixture.name}: unknown call method ${fixture.call.method}`);
+
+      let threw: Error | null = null;
+      let payResult: unknown = undefined;
+      let fetchResult: Response | undefined = undefined;
+
+      try {
+        if (fixture.call.method === "pay") {
+          payResult = await canopy.pay(fixture.call.args as Parameters<typeof canopy.pay>[0]);
+        } else if (fixture.call.method === "preview") {
+          payResult = await canopy.preview(
+            fixture.call.args as Parameters<typeof canopy.preview>[0],
+          );
+        } else if (fixture.call.method === "fetch") {
+          const args = fixture.call.args as { url: string; init?: RequestInit };
+          fetchResult = await canopy.fetch(args.url, args.init);
+        } else {
+          throw new Error(`Fixture ${fixture.name}: unknown call method`);
+        }
+      } catch (e) {
+        threw = e as Error;
       }
+
+      if (fixture.expectedThrow) {
+        if (!threw) throw new Error(`Fixture ${fixture.name}: expected throw, none occurred`);
+        expect(threw.name).toBe(fixture.expectedThrow.name);
+        if (fixture.expectedThrow.messageIncludes) {
+          expect(threw.message).toContain(fixture.expectedThrow.messageIncludes);
+        }
+        return;
+      }
+      if (threw) throw threw;
 
       expect(callIndex).toBe(fixture.httpExchange.length);
 
-      const err = matchSubset(result, fixture.expectedReturn);
-      if (err) throw new Error(`Return mismatch: ${err}`);
+      if (fixture.expectedReturn) {
+        const err = matchSubset(payResult, fixture.expectedReturn);
+        if (err) throw new Error(`Return mismatch: ${err}`);
+      }
+      if (fixture.expectedFetch && fetchResult) {
+        expect(fetchResult.status).toBe(fixture.expectedFetch.status);
+        if (fixture.expectedFetch.bodyEquals !== undefined) {
+          const bodyText = await fetchResult.text();
+          let parsed: unknown = bodyText;
+          try {
+            parsed = JSON.parse(bodyText);
+          } catch {
+            // keep as text
+          }
+          const err = matchSubset(parsed, fixture.expectedFetch.bodyEquals);
+          if (err) throw new Error(`Fetch body mismatch: ${err}`);
+        }
+      }
     });
   }
 });

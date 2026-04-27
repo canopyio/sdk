@@ -1,6 +1,16 @@
-import type { CanopyConfig, PayArgs, PayResult, ApprovalStatus, WaitForApprovalOptions, ToolFramework } from "./types.js";
+import type {
+  BudgetSnapshot,
+  CanopyConfig,
+  PayArgs,
+  PayResult,
+  ApprovalStatus,
+  PingResult,
+  WaitForApprovalOptions,
+  ToolFramework,
+} from "./types.js";
 import { Transport } from "./transport.js";
 import { CanopyConfigError } from "./errors.js";
+import { agentsUrl, apiKeysUrl } from "./dashboard-urls.js";
 import { encodeErc20Transfer, isEntitySlug, USDC_BASE, usdToUsdcUnits } from "./encoding.js";
 import { resolveEntity } from "./resolve.js";
 import { waitForApproval as waitForApprovalImpl, getApprovalStatus as getApprovalStatusImpl } from "./approval.js";
@@ -31,12 +41,14 @@ export class Canopy {
   readonly agentId?: string;
 
   constructor(config: CanopyConfig) {
+    const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
     if (!config.apiKey) {
-      throw new CanopyConfigError("apiKey is required");
+      const url = apiKeysUrl(baseUrl);
+      throw new CanopyConfigError(`apiKey is required. Create one at ${url}`, url);
     }
     this.apiKey = config.apiKey;
     this.agentId = config.agentId;
-    this.baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
+    this.baseUrl = baseUrl;
     this.transport = new Transport(this.baseUrl, this.apiKey);
   }
 
@@ -56,8 +68,10 @@ export class Canopy {
   private async signOrPreview(args: PayArgs, dryRun: boolean): Promise<PayResult> {
     const agentId = this.agentId;
     if (!agentId) {
+      const url = agentsUrl(this.baseUrl);
       throw new CanopyConfigError(
-        "agentId is required for pay()/preview(). Pass it to the Canopy constructor.",
+        `agentId is required for pay()/preview(). Pass it to the Canopy constructor. Create or find an agent at ${url}`,
+        url,
       );
     }
 
@@ -147,6 +161,115 @@ export class Canopy {
   getTools(opts: { framework: ToolFramework }) {
     return getToolsFor(this, opts.framework);
   }
+
+  /**
+   * Verify that the API key + agent are configured correctly. Use on app
+   * startup as a fail-fast health check. The dashboard's install modal
+   * reacts in real time when this lands, so it's also the moment a developer
+   * sees their agent transition from "Never connected" to "Connected".
+   */
+  /**
+   * Pre-flight cap snapshot for the current agent. Useful for LLM planning:
+   * "I have $4.30 left this window — defer the expensive call." Returns
+   * `capUsd: null` and `remainingUsd: null` when no policy is bound.
+   */
+  async budget(): Promise<BudgetSnapshot> {
+    const agentId = this.agentId;
+    if (!agentId) {
+      const url = agentsUrl(this.baseUrl);
+      throw new CanopyConfigError(
+        `agentId is required for budget(). Pass it to the Canopy constructor. Create or find an agent at ${url}`,
+        url,
+      );
+    }
+    const { body } = await this.transport.request<BudgetResponseBody>({
+      method: "GET",
+      path: `/api/agents/${encodeURIComponent(agentId)}/budget`,
+      expectStatuses: [200],
+    });
+    return mapBudgetResponse(body);
+  }
+
+  async ping(): Promise<PingResult> {
+    const agentId = this.agentId;
+    if (!agentId) {
+      const url = agentsUrl(this.baseUrl);
+      throw new CanopyConfigError(
+        `agentId is required for ping(). Pass it to the Canopy constructor. Create or find an agent at ${url}`,
+        url,
+      );
+    }
+    const start = Date.now();
+    const { body } = await this.transport.request<PingResponseBody>({
+      method: "POST",
+      path: "/api/ping",
+      body: { agent_id: agentId },
+      expectStatuses: [200],
+    });
+    const latencyMs = Date.now() - start;
+    return mapPingResponse(body, latencyMs);
+  }
+}
+
+interface BudgetResponseBody {
+  agent_id: string;
+  cap_usd: number | null;
+  spent_usd: number;
+  remaining_usd: number | null;
+  period_hours: number;
+  period_resets_at: string | null;
+}
+
+function mapBudgetResponse(body: BudgetResponseBody): BudgetSnapshot {
+  return {
+    agentId: body.agent_id,
+    capUsd: body.cap_usd,
+    spentUsd: body.spent_usd,
+    remainingUsd: body.remaining_usd,
+    periodHours: body.period_hours,
+    periodResetsAt: body.period_resets_at,
+  };
+}
+
+interface PingResponseBody {
+  ok: true;
+  agent_id?: string;
+  agent_name?: string | null;
+  status?: string;
+  agent?: {
+    id?: string;
+    name?: string | null;
+    status?: string;
+    policy_id?: string | null;
+    policy_name?: string | null;
+  };
+  org?: {
+    name?: string | null;
+    treasury_address?: string;
+  };
+}
+
+function mapPingResponse(body: PingResponseBody, latencyMs: number): PingResult {
+  // Prefer the structured `agent` / `org` fields; fall back to the legacy flat
+  // fields so this SDK still works against older canopy-app deployments.
+  const agentId = body.agent?.id ?? body.agent_id ?? "";
+  const agentName = body.agent?.name ?? body.agent_name ?? null;
+  const status = body.agent?.status ?? body.status ?? "unknown";
+  return {
+    ok: true,
+    agent: {
+      id: agentId,
+      name: agentName,
+      status,
+      policyId: body.agent?.policy_id ?? null,
+      policyName: body.agent?.policy_name ?? null,
+    },
+    org: {
+      name: body.org?.name ?? null,
+      treasuryAddress: body.org?.treasury_address ?? "",
+    },
+    latencyMs,
+  };
 }
 
 function parseCostUsd(raw: string | null | undefined): number | null {

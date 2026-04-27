@@ -1,0 +1,80 @@
+{
+  "name": "x402_payment_success",
+  "description": "canopy.fetch() against a paywalled URL: 402 → /api/sign returns x_payment_header → retry with X-PAYMENT succeeds.",
+  "config": {
+    "apiKey": "ak_live_test",
+    "agentId": "agt_test",
+    "baseUrl": "https://api.canopy.test"
+  },
+  "call": {
+    "method": "fetch",
+    "args": { "url": "https://paywalled.example.com/api/data" }
+  },
+  "httpExchange": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://paywalled.example.com/api/data"
+      },
+      "response": {
+        "status": 402,
+        "body": {
+          "x402Version": 1,
+          "accepts": [
+            {
+              "scheme": "exact",
+              "network": "base",
+              "maxAmountRequired": "100000",
+              "resource": "https://paywalled.example.com/api/data",
+              "description": "Premium API endpoint",
+              "payTo": "0x2222222222222222222222222222222222222222",
+              "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              "maxTimeoutSeconds": 60
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.canopy.test/api/sign",
+        "headers": {
+          "authorization": "Bearer ak_live_test",
+          "content-type": "application/json"
+        },
+        "bodyMatches": {
+          "agent_id": "agt_test",
+          "type": "x402",
+          "chain_id": 8453,
+          "recipient_address": "0x2222222222222222222222222222222222222222"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "signature": "0xfeedbeef",
+          "x_payment_header": "eyJ4NDAyVmVyc2lvbiI6MX0=",
+          "transaction_id": "22222222-2222-2222-2222-222222222222"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://paywalled.example.com/api/data",
+        "headers": {
+          "x-payment": "eyJ4NDAyVmVyc2lvbiI6MX0="
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": { "data": "premium content" }
+      }
+    }
+  ],
+  "expectedFetch": {
+    "status": 200,
+    "bodyEquals": { "data": "premium content" }
+  }
+}

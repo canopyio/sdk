@@ -92,9 +92,13 @@ def test_fixture(fixture: dict[str, Any]) -> None:
             if err:
                 raise AssertionError(f"Body mismatch: {err}")
 
+        resp_headers = {"content-type": "application/json"}
+        if ex["response"].get("headers"):
+            resp_headers.update(ex["response"]["headers"])
         return httpx.Response(
             status_code=ex["response"]["status"],
             json=ex["response"]["body"],
+            headers=resp_headers,
         )
 
     transport = httpx.MockTransport(handler)
@@ -109,19 +113,55 @@ def test_fixture(fixture: dict[str, Any]) -> None:
 
     method = fixture["call"]["method"]
     args = fixture["call"]["args"]
-    # Translate camelCase SDK args to snake_case kwargs.
-    kwargs = {_CAMEL_TO_SNAKE.sub("_", k).lower(): v for k, v in args.items()}
 
-    if method == "pay":
-        result = canopy.pay(**kwargs)
-    elif method == "preview":
-        result = canopy.preview(**kwargs)
-    else:
-        raise AssertionError(f"Unknown call method: {method}")
+    threw: Exception | None = None
+    pay_result: Any = None
+    fetch_result: httpx.Response | None = None
+
+    try:
+        if method == "fetch":
+            fetch_result = canopy.fetch(args["url"])
+        else:
+            # Translate camelCase SDK args to snake_case kwargs.
+            kwargs = {_CAMEL_TO_SNAKE.sub("_", k).lower(): v for k, v in args.items()}
+            if method == "pay":
+                pay_result = canopy.pay(**kwargs)
+            elif method == "preview":
+                pay_result = canopy.preview(**kwargs)
+            else:
+                raise AssertionError(f"Unknown call method: {method}")
+    except Exception as e:  # noqa: BLE001
+        threw = e
+
+    expected_throw = fixture.get("expectedThrow")
+    if expected_throw:
+        assert threw is not None, f"Fixture {fixture['name']}: expected throw, none occurred"
+        assert type(threw).__name__ == expected_throw["name"], (
+            f"Expected {expected_throw['name']}, got {type(threw).__name__}: {threw}"
+        )
+        if "messageIncludes" in expected_throw:
+            assert expected_throw["messageIncludes"] in str(threw), (
+                f"Expected message to include {expected_throw['messageIncludes']!r}, got {threw!s}"
+            )
+        return
+    if threw is not None:
+        raise threw
 
     assert call_index["i"] == len(exchange), "SDK did not make all expected HTTP calls"
 
-    expected_return = camel_to_snake_keys(fixture["expectedReturn"])
-    err = subset_match(result, expected_return)
-    if err:
-        raise AssertionError(f"Return mismatch: {err}")
+    if "expectedReturn" in fixture:
+        expected_return = camel_to_snake_keys(fixture["expectedReturn"])
+        err = subset_match(pay_result, expected_return)
+        if err:
+            raise AssertionError(f"Return mismatch: {err}")
+    if "expectedFetch" in fixture and fetch_result is not None:
+        expected_fetch = fixture["expectedFetch"]
+        assert fetch_result.status_code == expected_fetch["status"]
+        if "bodyEquals" in expected_fetch:
+            try:
+                parsed: Any = fetch_result.json()
+            except ValueError:
+                parsed = fetch_result.text
+            err = subset_match(parsed, expected_fetch["bodyEquals"])
+            if err:
+                raise AssertionError(f"Fetch body mismatch: {err}")

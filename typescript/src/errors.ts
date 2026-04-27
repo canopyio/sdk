@@ -8,12 +8,15 @@ export class CanopyError extends Error {
 export class CanopyApiError extends CanopyError {
   status: number;
   body: unknown;
+  /** Dashboard URL the developer should open to fix this, if known. */
+  dashboardUrl?: string;
 
-  constructor(status: number, message: string, body?: unknown) {
+  constructor(status: number, message: string, body?: unknown, dashboardUrl?: string) {
     super(message);
     this.name = "CanopyApiError";
     this.status = status;
     this.body = body;
+    this.dashboardUrl = dashboardUrl;
   }
 }
 
@@ -28,9 +31,13 @@ export class CanopyNetworkError extends CanopyError {
 }
 
 export class CanopyConfigError extends CanopyError {
-  constructor(message: string) {
+  /** Dashboard URL the developer should open to fix this, if known. */
+  dashboardUrl?: string;
+
+  constructor(message: string, dashboardUrl?: string) {
     super(message);
     this.name = "CanopyConfigError";
+    this.dashboardUrl = dashboardUrl;
   }
 }
 

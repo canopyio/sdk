@@ -1,0 +1,60 @@
+{
+  "name": "x402_denied_by_policy",
+  "description": "402 → /api/sign returns 403 (policy denied this x402 payment). SDK throws CanopyApiError; no retry.",
+  "config": {
+    "apiKey": "ak_live_test",
+    "agentId": "agt_test",
+    "baseUrl": "https://api.canopy.test"
+  },
+  "call": {
+    "method": "fetch",
+    "args": { "url": "https://paywalled.example.com/api/expensive" }
+  },
+  "httpExchange": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://paywalled.example.com/api/expensive"
+      },
+      "response": {
+        "status": 402,
+        "body": {
+          "x402Version": 1,
+          "accepts": [
+            {
+              "scheme": "exact",
+              "network": "base",
+              "maxAmountRequired": "999999999",
+              "resource": "https://paywalled.example.com/api/expensive",
+              "payTo": "0x3333333333333333333333333333333333333333",
+              "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              "maxTimeoutSeconds": 60
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.canopy.test/api/sign",
+        "bodyMatches": {
+          "agent_id": "agt_test",
+          "type": "x402"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "error": "Policy denied",
+          "reason": "Spend cap exceeded for this period",
+          "transaction_id": "33333333-3333-3333-3333-333333333333"
+        }
+      }
+    }
+  ],
+  "expectedThrow": {
+    "name": "CanopyApiError",
+    "messageIncludes": "Policy denied"
+  }
+}
