@@ -65,7 +65,7 @@ Any MCP host with a `mcpServers` config block will work with the same shape — 
 
 ## Available tools
 
-Four tools covering the full payment lifecycle:
+Six tools covering the full payment lifecycle:
 
 ### `canopy_pay`
 
@@ -132,9 +132,46 @@ Block until an approval is decided, or up to 60 seconds. Useful when the user is
 
 `timeoutMs` is optional and capped at `60000` regardless of caller input — long timeouts would hold the MCP transport. Returns the same shape as `canopy_get_approval_status`.
 
+### `canopy_ping`
+
+Verify the configured API key + agent are valid. Returns the agent and org details plus round-trip latency. Useful as a first-turn self-check ("am I configured correctly?").
+
+**Arguments**: none.
+
+**Returns**
+```json
+{
+  "ok": true,
+  "agent": { "id": "agt_...", "name": "Trader", "status": "active",
+             "policyId": "...", "policyName": "trading.default" },
+  "org":   { "name": "Acme", "treasuryAddress": "0x..." },
+  "latencyMs": 84
+}
+```
+
+### `canopy_get_budget`
+
+Pre-flight cap snapshot — useful for the LLM to plan ahead ("I have $4.30 left this window, defer the expensive call").
+
+**Arguments**: none.
+
+**Returns**
+```json
+{
+  "agentId": "agt_...",
+  "capUsd": 5,
+  "spentUsd": 1.25,
+  "remainingUsd": 3.75,
+  "periodHours": 24,
+  "periodResetsAt": "2026-04-28T12:00:00.000Z"
+}
+```
+
+When no policy is bound to the agent, `capUsd` and `remainingUsd` are `null` (no cap).
+
 ## How the LLM experiences it
 
-Once the server is loaded, the host exposes both tools in its normal tool UI. The LLM decides when to call `canopy_pay`; the host runs the call; Canopy's policy engine decides `allowed` / `pending_approval` / `denied`; the result comes back as tool output the LLM reads. A typical prompt flow:
+Once the server is loaded, the host exposes all six tools in its normal tool UI. The LLM decides when to call `canopy_pay`; the host runs the call; Canopy's policy engine decides `allowed` / `pending_approval` / `denied`; the result comes back as tool output the LLM reads. A typical prompt flow:
 
 > **You:** send $0.10 to 0x1234…
 > **LLM:** *[calls `canopy_pay({ to: "0x1234…", amountUsd: 0.10 })`]*
@@ -181,7 +218,7 @@ Use a test-mode key (`ak_test_…`) so you don't pollute production data.
 
 ## What's under the hood
 
-`@canopy-ai/mcp` is a thin wrapper around [`@canopy-ai/sdk`](../typescript). It's an stdio MCP server (the official `@modelcontextprotocol/sdk`) that exposes `canopy.pay`, `canopy.preview`, `canopy.getApprovalStatus`, and `canopy.waitForApproval` as MCP tools. No custody — the server just proxies to Canopy's API with your key.
+`@canopy-ai/mcp` is a thin wrapper around [`@canopy-ai/sdk`](../typescript). It's an stdio MCP server (the official `@modelcontextprotocol/sdk`) that exposes `canopy.pay`, `canopy.preview`, `canopy.getApprovalStatus`, `canopy.waitForApproval`, `canopy.ping`, and `canopy.budget` as MCP tools. No custody — the server just proxies to Canopy's API with your key.
 
 ## Version
 
