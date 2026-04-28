@@ -84,10 +84,10 @@ export interface DecideApprovalResult {
 }
 
 /**
- * Canonical tool shape returned by `canopy.getTools()`. Works directly with
- * Vercel AI SDK, LangChain, Mastra, and MCP. For OpenAI / Anthropic, the
- * READMEs show one-line wrap recipes (their APIs use slightly different
- * envelope shapes).
+ * Canonical tool shape returned by `canopy.getTools()` — framework-agnostic
+ * `{ name, description, parameters: JSONSchema, execute }`. Pre-shaped
+ * variants live on `canopy.openai`, `canopy.anthropic`, `canopy.vercel`, and
+ * the `@canopy-ai/sdk/langchain` subpath.
  *
  * `parameters` is a JSON Schema object. `execute` is the bound implementation
  * that calls the underlying SDK method.

@@ -115,18 +115,20 @@ const res = await canopy.fetch("https://paid-api.example.com/generate", undefine
 
 ## Plug Canopy into your agent
 
-The `Canopy` instance carries framework-shaped tool helpers. Pick the namespace that matches your stack — each one returns the right shape for that framework, no transforms needed.
+**Already running an MCP-aware agent?** Skip this section — install [`@canopy-ai/mcp`](../mcp) once and your agent gets all four canonical Canopy tools through MCP. That's the right path for Claude Agent SDK, Claude Desktop, Cursor, Cline, Windsurf, and any future MCP host. The native adapters below are for direct LLM-API flows where MCP isn't a fit (backend scripts, x402 auto-paying via `canopy.fetch()`, raw `chat.completions.create` / `messages.create` loops, edge runtimes).
 
 | Framework | Helper | Lines of glue |
 |---|---|---|
+| MCP host (Claude Desktop, Cursor, Cline, Windsurf) | install [`@canopy-ai/mcp`](../mcp) | 0 |
+| Claude Agent SDK | Canopy MCP + `allowedTools: ["mcp__canopy__*"]` | 0 Canopy code |
 | Vercel AI SDK (v3+) | `canopy.vercel.tools()` | 1 |
 | OpenAI Chat Completions / Responses | `canopy.openai.tools()` + `canopy.openai.dispatch()` | 2 |
 | Anthropic Messages | `canopy.anthropic.tools()` + `canopy.anthropic.dispatch()` | 2 |
 | LangChain JS (v0.3+) | `import { toLangChainTools } from "@canopy-ai/sdk/langchain"` | 1 |
-| Mastra | `createTool({ ... canopy.pay })` per tool | small |
-| MCP host (Claude Desktop, Cursor, Cline, Windsurf) | install [`@canopy-ai/mcp`](../mcp) | 0 |
 
 `canopy.getTools()` is still available as the canonical, framework-agnostic shape (`{ name, description, parameters: JSONSchema, execute }[]`) for any framework not listed.
+
+Claude Agent SDK uses MCP for external tools — prefer [`@canopy-ai/mcp`](../mcp) over the Anthropic Messages adapter there. `canopy.anthropic` is for direct `@anthropic-ai/sdk` Messages API loops.
 
 ### Vercel AI SDK
 
@@ -231,24 +233,6 @@ const lcTools = toLangChainTools(canopy);  // DynamicStructuredTool[]
 ```
 
 `@canopy-ai/sdk/langchain` is a subpath import — `@langchain/core` is an optional peer dep, so installs that don't use LangChain don't pay for it.
-
-### Mastra
-
-```ts
-import { createTool } from "@mastra/core/tools";
-
-const mastraTools = Object.fromEntries(
-  canopy.getTools().map((t) => [
-    t.name,
-    createTool({
-      id: t.name,
-      description: t.description,
-      inputSchema: t.parameters,
-      execute: ({ context }) => t.execute(context),
-    }),
-  ]),
-);
-```
 
 ### Pay paywalled APIs (x402)
 

@@ -6,10 +6,11 @@ import type { CanopyTool } from "../types.js";
  *
  *   - `canopy_pay` — issue a USD payment, gated by the agent's policy.
  *   - `canopy_discover_services` — list paid services the agent can call.
+ *   - `canopy_approve` / `canopy_deny` — resolve a pending approval in chat.
  *
- * Each tool has the canonical shape `{ name, description, parameters: JSONSchema, execute }`
- * which works directly with Vercel AI SDK, LangChain, Mastra, and MCP. For
- * OpenAI / Anthropic, see the README for the one-line wrap recipe.
+ * Each tool has the canonical shape `{ name, description, parameters: JSONSchema, execute }`,
+ * framework-agnostic. For pre-shaped output use `canopy.openai`,
+ * `canopy.anthropic`, `canopy.vercel`, or the `@canopy-ai/sdk/langchain` subpath.
  *
  * Filter the array if you want a subset (e.g. pay-only):
  *   `canopy.getTools().filter(t => t.name === "canopy_pay")`

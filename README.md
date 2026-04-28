@@ -6,11 +6,11 @@
 
 | Package | Install | Use when |
 |---|---|---|
-| **[`@canopy-ai/sdk`](./typescript)** | `npm install @canopy-ai/sdk` | TypeScript / Node.js agents |
-| **[`canopy-ai`](./python)** | `pip install canopy-ai` | Python agents (LangChain, LangGraph, custom) |
-| **[`@canopy-ai/mcp`](./mcp)** | `npx -y @canopy-ai/mcp` | You're using an MCP host (Claude Desktop, Cursor, Cline) and want a payment tool with no code changes |
+| **[`@canopy-ai/mcp`](./mcp)** | `npx -y @canopy-ai/mcp` | **Default for any MCP-aware agent** — Claude Agent SDK, Claude Desktop, Cursor, Cline, Windsurf. One install, all four canonical Canopy tools, zero code changes. |
+| **[`@canopy-ai/sdk`](./typescript)** | `npm install @canopy-ai/sdk` | TypeScript / Node.js agents that call `canopy.pay()` directly, auto-pay x402 endpoints via `canopy.fetch()`, or wire raw OpenAI / Anthropic / Vercel / LangChain flows where MCP isn't a fit. |
+| **[`canopy-ai`](./python)** | `pip install canopy-ai` | Python agents in the same situations — pure-API use, x402 paywalled APIs, raw `chat.completions.create` / `messages.create`, LangChain / LangGraph / OpenAI Agents SDK. |
 
-All three share the same wire format and return shapes — pick whichever matches your stack.
+All three share the same wire format and return shapes. Start with `@canopy-ai/mcp` if your runtime supports MCP — it covers the broadest set of agent hosts with the smallest install footprint. Fall back to the language SDKs for cases MCP doesn't reach.
 
 ## 30-second example
 
@@ -71,7 +71,7 @@ Every SDK exposes the same surface:
 | `canopy.anthropic.tools()` / `.dispatch()` | Same, for Anthropic Messages. |
 | `canopy.vercel.tools()` | Vercel AI SDK shape — passes through directly to `generateText`. |
 
-For LangChain (`@canopy-ai/sdk/langchain` / `canopy_ai.langchain`) and OpenAI Agents SDK (`canopy_ai.openai_agents`) we ship subpath imports with optional peer deps so you only pay for what you use. The package READMEs ([typescript](./typescript), [python](./python)) have copy-paste recipes for each framework.
+For LangChain (`@canopy-ai/sdk/langchain` / `canopy_ai.langchain`) and OpenAI Agents SDK (`canopy_ai.openai_agents`) we ship subpath imports with optional peer deps so you only pay for what you use. For Claude Agent SDK, use the Canopy MCP server with `allowedTools: ["mcp__canopy__*"]`. The package READMEs ([typescript](./typescript), [python](./python), [mcp](./mcp)) have copy-paste recipes for each framework.
 
 ## Repo layout
 

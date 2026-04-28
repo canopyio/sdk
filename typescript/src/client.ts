@@ -218,10 +218,12 @@ export class Canopy {
   }
 
   /**
-   * Returns the SDK's canonical tools (`canopy_pay`, `canopy_discover_services`)
-   * as `{ name, description, parameters: JSONSchema, execute }[]`. Works
-   * directly with Vercel AI SDK, LangChain, Mastra, and MCP. For OpenAI /
-   * Anthropic, see the README for the one-line wrap recipe.
+   * Returns the SDK's canonical tools (`canopy_pay`, `canopy_discover_services`,
+   * `canopy_approve`, `canopy_deny`) as `{ name, description, parameters:
+   * JSONSchema, execute }[]`. Works directly with any framework that consumes
+   * JSON Schema. For framework-shaped output, prefer `canopy.openai`,
+   * `canopy.anthropic`, `canopy.vercel`, or the `@canopy-ai/sdk/langchain`
+   * subpath.
    */
   getTools(): CanopyTool[] {
     return getToolsImpl(this);

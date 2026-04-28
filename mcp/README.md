@@ -1,19 +1,61 @@
 # @canopy-ai/mcp
 
-[Canopy](https://www.trycanopy.ai) as an [MCP](https://modelcontextprotocol.io) server. Drop it into Claude Desktop, Cursor, or Cline and whichever agent runs in that host gets a policy-gated `canopy_pay` tool — no code changes required.
+[Canopy](https://www.trycanopy.ai) as an [MCP](https://modelcontextprotocol.io) server. Use it from Claude Agent SDK, Claude Desktop, Cursor, Cline, or Windsurf to give an existing agent policy-gated payment tools.
 
 ## What this is for
 
-You're running an agent inside a host app (Claude Desktop, Cursor, Cline, Windsurf) and you don't want to modify its source to add payment capability. MCP is the neutral plug. You add Canopy once to the host's config, every conversation in that host can now pay.
+You're running an agent in Claude Agent SDK or inside a host app (Claude Desktop, Cursor, Cline, Windsurf) and you don't want to write a custom payment tool. MCP is the neutral plug. You add Canopy once, and the agent can discover services, check budget, request payments, and resolve chat-native approvals under the policy you set in Canopy.
+
+This is the **recommended path** for any MCP-aware agent runtime — one install, every host, zero code changes.
+
+## When to use the language SDKs instead
+
+Reach for [`@canopy-ai/sdk`](../typescript) or [`canopy-ai`](../python) when MCP isn't a fit:
+
+- **Backend scripts** that call `canopy.pay()` directly with no LLM in the loop — `pip install canopy-ai` + 3 lines beats spinning up a stdio child process.
+- **x402 auto-paying** with `canopy.fetch()` against paywalled APIs from your own code.
+- **Raw LLM API loops** — direct `chat.completions.create` / `messages.create` flows where you don't want MCP overhead. The native adapters (`canopy.openai`, `canopy.anthropic`, `canopy.vercel`, plus LangChain / OpenAI Agents SDK subpaths) cover these.
+- **Edge / serverless runtimes** where stdio MCP servers are awkward.
+
+The wire format is identical, so you can mix freely — e.g., MCP for the agent's tool surface and the language SDK for `canopy.fetch()` x402 calls in the same project.
 
 ## Setup
 
 1. **Create an org** at <https://www.trycanopy.ai>.
 2. **Generate an API key**: Dashboard → Settings → API Keys → Create. Copy the `ak_live_…`.
-3. **Create an agent**: Dashboard → Agents → Add Agent. Copy the `agt_…` id.
-4. **Add Canopy to your MCP host config** (below).
+3. **Create an agent**: Dashboard → Agents → Connect agent. Pick an existing policy or create one in the flow, then copy the `agt_…` id.
+4. **Add Canopy to Claude Agent SDK or your MCP host config** (below).
 
 You don't install `@canopy-ai/mcp` globally. `npx` fetches it on first run.
+
+## Claude Agent SDK
+
+Claude Agent SDK can launch Canopy as a stdio MCP server from your `query()` options. Claude requires MCP tools to be explicitly allowed; with the server named `canopy`, use `allowedTools: ["mcp__canopy__*"]`.
+
+```ts
+import { query } from "@anthropic-ai/claude-agent-sdk";
+
+for await (const message of query({
+  prompt: "Find a data feed and pay for BTC orderbook depth.",
+  options: {
+    mcpServers: {
+      canopy: {
+        command: "npx",
+        args: ["-y", "@canopy-ai/mcp"],
+        env: {
+          CANOPY_API_KEY: process.env.CANOPY_API_KEY!,
+          CANOPY_AGENT_ID: process.env.CANOPY_AGENT_ID!,
+        },
+      },
+    },
+    allowedTools: ["mcp__canopy__*"],
+  },
+})) {
+  if (message.type === "result") console.log(message.result);
+}
+```
+
+To narrow permissions, list individual tools such as `mcp__canopy__canopy_pay` and `mcp__canopy__canopy_get_budget`.
 
 ## Host configs
 

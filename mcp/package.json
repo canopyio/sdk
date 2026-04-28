@@ -1,7 +1,7 @@
 {
   "name": "@canopy-ai/mcp",
   "version": "0.0.1",
-  "description": "MCP server that exposes Canopy's pay tool to any MCP-compatible agent (Claude Desktop, Cursor, Cline).",
+  "description": "MCP server that exposes Canopy payment and discovery tools to Claude Agent SDK and MCP-compatible hosts.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -45,7 +45,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@canopy-ai/sdk": "workspace:*",
+    "@canopy-ai/sdk": "0.0.1",
     "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {
