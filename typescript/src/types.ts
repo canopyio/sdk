@@ -34,6 +34,15 @@ export type PayResult =
       approvalId: string;
       transactionId: string;
       reason: string;
+      /** Resolved name of the recipient from the Canopy registry, when available. */
+      recipientName: string | null;
+      recipientAddress: string | null;
+      amountUsd: number | null;
+      agentName: string | null;
+      /** ISO timestamp; the approval is auto-cancelled after this. */
+      expiresAt: string | null;
+      /** When false, calling canopy.approve()/deny() will fail with CanopyChatApprovalDisabledError. */
+      chatApprovalEnabled: boolean;
     }
   | {
       status: "denied";
@@ -46,6 +55,8 @@ export interface ApprovalStatus {
   decidedAt: string | null;
   expiresAt: string;
   transactionId: string;
+  /** For x402 transactions resumed after approval, the X-PAYMENT header to retry the resource URL. */
+  xPaymentHeader: string | null;
 }
 
 export interface WaitForApprovalOptions {
@@ -53,7 +64,74 @@ export interface WaitForApprovalOptions {
   pollIntervalMs?: number;
 }
 
-export type ToolFramework = "openai" | "anthropic" | "vercel" | "langchain";
+export interface CanopyFetchOptions {
+  /**
+   * If `false` (default), `canopy.fetch()` throws `CanopyApprovalRequiredError`
+   * when a payment goes pending_approval — the caller decides what to do.
+   *
+   * If `true` or a number of milliseconds, the SDK polls until the approval is
+   * decided, then either retries the URL with the recovered `X-PAYMENT` header
+   * (on approve) or throws `CanopyApprovalDeniedError` / `CanopyApprovalExpiredError`.
+   */
+  waitForApproval?: boolean | number;
+}
+
+export interface DecideApprovalResult {
+  decision: "approved" | "denied";
+  transactionId: string | null;
+  txHash: string | null;
+  signature: string | null;
+}
+
+/**
+ * Canonical tool shape returned by `canopy.getTools()`. Works directly with
+ * Vercel AI SDK, LangChain, Mastra, and MCP. For OpenAI / Anthropic, the
+ * READMEs show one-line wrap recipes (their APIs use slightly different
+ * envelope shapes).
+ *
+ * `parameters` is a JSON Schema object. `execute` is the bound implementation
+ * that calls the underlying SDK method.
+ */
+export interface CanopyTool {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  // `any` here is deliberate: the framework you bind these to (Vercel AI,
+  // LangChain, etc.) supplies its own typed wrapper at the boundary, so
+  // narrowing here would just create assignment friction without adding
+  // safety. Internal builders construct typed args before calling.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  execute: (args: any) => Promise<unknown>;
+}
+
+export interface DiscoverArgs {
+  /** Filter by one or more category slugs (e.g. `"data"`, `"api"`). */
+  category?: string | string[];
+  /** Free-text match on service name + description. */
+  query?: string;
+  /** Include `verified = false` services from the long tail. Default false. */
+  includeUnverified?: boolean;
+  /** Include services blocked by the agent's policy, marked `policyAllowed: false`. Default false. */
+  includeBlocked?: boolean;
+  /** Default 20, capped at 50 server-side. */
+  limit?: number;
+}
+
+export interface DiscoveredService {
+  slug: string;
+  name: string;
+  description: string | null;
+  /** The endpoint to hit with `canopy.fetch(url)`. May be `null` for entries without a known URL. */
+  url: string | null;
+  category: string;
+  paymentProtocol: string | null;
+  /** Hint cost — actual price comes from the 402 response. */
+  typicalAmountUsd: number | null;
+  /** On-chain `payTo` address. */
+  payTo: string;
+  /** False only when `includeBlocked: true` returned a service the policy blocks. */
+  policyAllowed: boolean;
+}
 
 export interface BudgetSnapshot {
   agentId: string;

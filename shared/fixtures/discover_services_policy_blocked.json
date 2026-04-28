@@ -1,0 +1,55 @@
+{
+  "name": "discover_services_policy_blocked",
+  "description": "With include_blocked=true, /api/services returns policy-blocked services with policyAllowed=false. SDK passes that flag through and surfaces the field.",
+  "config": {
+    "apiKey": "ak_live_test",
+    "agentId": "agt_test",
+    "baseUrl": "https://api.canopy.test"
+  },
+  "call": {
+    "method": "discover",
+    "args": { "includeBlocked": true }
+  },
+  "httpExchange": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.canopy.test/api/services?include_blocked=true&agent_id=agt_test"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "services": [
+            {
+              "slug": "agentic.market/allowed-feed",
+              "name": "Allowed Feed",
+              "description": "On the agent's allowlist.",
+              "url": "https://allowed.example/v1",
+              "category": "data",
+              "paymentProtocol": "x402",
+              "typicalAmountUsd": 0.005,
+              "payTo": "0x1111111111111111111111111111111111111111",
+              "policyAllowed": true
+            },
+            {
+              "slug": "agentic.market/blocked-feed",
+              "name": "Blocked Feed",
+              "description": "Policy-blocked; returned because include_blocked=true.",
+              "url": "https://blocked.example/v1",
+              "category": "data",
+              "paymentProtocol": "x402",
+              "typicalAmountUsd": 0.05,
+              "payTo": "0x9999999999999999999999999999999999999999",
+              "policyAllowed": false
+            }
+          ],
+          "count": 2
+        }
+      }
+    }
+  ],
+  "expectedReturn": [
+    { "name": "Allowed Feed", "policyAllowed": true },
+    { "name": "Blocked Feed", "policyAllowed": false }
+  ]
+}

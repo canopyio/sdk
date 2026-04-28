@@ -125,6 +125,31 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {},
       },
     },
+    {
+      name: "canopy_discover_services",
+      description:
+        "List paid services the agent can call (x402 by default). Filter by category " +
+        "(data/api/compute/service/...) or a free-text query. Returns services from the " +
+        "agent's policy allowlist by default. Each result has a `url` you can hand to " +
+        "canopy.fetch(); the resulting 402 will auto-pay.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          category: {
+            type: "string",
+            description: "Filter by category slug (e.g. 'data', 'api', 'compute'). Optional.",
+          },
+          query: {
+            type: "string",
+            description: "Free-text match on service name + description. Optional.",
+          },
+          limit: {
+            type: "number",
+            description: "Max results to return. Default 20, capped at 50.",
+          },
+        },
+      },
+    },
   ],
 }));
 
@@ -160,6 +185,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
   if (name === "canopy_get_budget") {
     const result = await canopy.budget();
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+  if (name === "canopy_discover_services") {
+    const typed = (args ?? {}) as { category?: string; query?: string; limit?: number };
+    const result = await canopy.discover(typed);
     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
   }
   throw new Error(`Unknown tool: ${name}`);

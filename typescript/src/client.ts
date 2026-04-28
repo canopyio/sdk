@@ -1,21 +1,31 @@
 import type {
   BudgetSnapshot,
   CanopyConfig,
+  CanopyFetchOptions,
+  CanopyTool,
+  DecideApprovalResult,
+  DiscoverArgs,
+  DiscoveredService,
   PayArgs,
   PayResult,
   ApprovalStatus,
   PingResult,
   WaitForApprovalOptions,
-  ToolFramework,
 } from "./types.js";
 import { Transport } from "./transport.js";
 import { CanopyConfigError } from "./errors.js";
 import { agentsUrl, apiKeysUrl } from "./dashboard-urls.js";
 import { encodeErc20Transfer, isEntitySlug, USDC_BASE, usdToUsdcUnits } from "./encoding.js";
 import { resolveEntity } from "./resolve.js";
-import { waitForApproval as waitForApprovalImpl, getApprovalStatus as getApprovalStatusImpl } from "./approval.js";
+import {
+  approve as approveImpl,
+  deny as denyImpl,
+  getApprovalStatus as getApprovalStatusImpl,
+  waitForApproval as waitForApprovalImpl,
+} from "./approval.js";
 import { canopyFetch } from "./fetch.js";
-import { getToolsFor } from "./tools/index.js";
+import { discover as discoverImpl } from "./discover.js";
+import { getTools as getToolsImpl } from "./tools/index.js";
 
 const DEFAULT_BASE_URL = "https://www.trycanopy.ai";
 const DEFAULT_CHAIN_ID = 8453;
@@ -32,6 +42,13 @@ interface SignResponseBody {
   reason?: string;
   approval_request_id?: string;
   error?: string;
+  // Pending-approval enrichment (202 only)
+  recipient_name?: string | null;
+  recipient_address?: string | null;
+  amount_usd?: number | null;
+  agent_name?: string | null;
+  expires_at?: string | null;
+  chat_approval_enabled?: boolean;
 }
 
 export class Canopy {
@@ -129,6 +146,12 @@ export class Canopy {
         approvalId: body.approval_request_id ?? "",
         transactionId: body.transaction_id ?? "",
         reason: body.reason ?? "Approval required",
+        recipientName: body.recipient_name ?? null,
+        recipientAddress: body.recipient_address ?? null,
+        amountUsd: body.amount_usd ?? null,
+        agentName: body.agent_name ?? null,
+        expiresAt: body.expires_at ?? null,
+        chatApprovalEnabled: body.chat_approval_enabled ?? true,
       };
     }
     // 403
@@ -150,16 +173,55 @@ export class Canopy {
   }
 
   /**
-   * `fetch` wrapper that transparently handles HTTP 402 Payment Required
-   * responses per the x402 spec.
+   * Mark a pending approval as approved. Call this when the user explicitly
+   * approves a transaction in chat (e.g., they replied "yes", "approve").
+   * The org's policy must have `chat_approval_enabled = true` (default true).
    */
-  fetch(url: string, init?: RequestInit): Promise<Response> {
-    return canopyFetch(this.transport, this.agentId, url, init);
+  approve(approvalId: string): Promise<DecideApprovalResult> {
+    return approveImpl(this.transport, approvalId);
   }
 
-  /** Returns LLM-tool schemas for the requested framework. Bind to your LLM call. */
-  getTools(opts: { framework: ToolFramework }) {
-    return getToolsFor(this, opts.framework);
+  /**
+   * Mark a pending approval as denied. Call this when the user explicitly
+   * denies a transaction in chat (e.g., they replied "no", "cancel").
+   */
+  deny(approvalId: string): Promise<DecideApprovalResult> {
+    return denyImpl(this.transport, approvalId);
+  }
+
+  /**
+   * `fetch` wrapper that transparently handles HTTP 402 Payment Required
+   * responses per the x402 spec.
+   *
+   * Pass `{ waitForApproval: true | <ms> }` to block until a pending approval
+   * is decided and then retry the URL with the recovered X-PAYMENT header.
+   */
+  fetch(
+    url: string,
+    init?: RequestInit,
+    opts?: CanopyFetchOptions,
+  ): Promise<Response> {
+    return canopyFetch(this.transport, this.agentId, url, init, opts);
+  }
+
+  /**
+   * Returns the SDK's canonical tools (`canopy_pay`, `canopy_discover_services`)
+   * as `{ name, description, parameters: JSONSchema, execute }[]`. Works
+   * directly with Vercel AI SDK, LangChain, Mastra, and MCP. For OpenAI /
+   * Anthropic, see the README for the one-line wrap recipe.
+   */
+  getTools(): CanopyTool[] {
+    return getToolsImpl(this);
+  }
+
+  /**
+   * Discover paid services the agent can call. Filtered by category, free-text
+   * query, etc. By default, only services on the agent's policy allowlist are
+   * returned (when an allowlist is set); pass `includeBlocked: true` to see
+   * blocked services too, marked `policyAllowed: false`.
+   */
+  discover(args: DiscoverArgs = {}): Promise<DiscoveredService[]> {
+    return discoverImpl(this.transport, this.agentId, args);
   }
 
   /**

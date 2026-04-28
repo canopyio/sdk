@@ -10,6 +10,9 @@ from canopy_ai.errors import (
 from canopy_ai.types import (
     ApprovalStatus,
     BudgetSnapshot,
+    CanopyTool,
+    DiscoverArgs,
+    DiscoveredService,
     PayResult,
     PayResultAllowed,
     PayResultDenied,
@@ -32,4 +35,7 @@ __all__ = [
     "ApprovalStatus",
     "PingResult",
     "BudgetSnapshot",
+    "CanopyTool",
+    "DiscoverArgs",
+    "DiscoveredService",
 ]

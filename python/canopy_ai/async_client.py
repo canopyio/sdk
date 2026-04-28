@@ -14,7 +14,7 @@ import asyncio
 import base64
 import json
 import time
-from typing import Any, Literal
+from typing import Any
 from urllib.parse import quote
 
 import httpx
@@ -33,17 +33,20 @@ from canopy_ai.errors import (
     CanopyError,
     CanopyNetworkError,
 )
+from canopy_ai.discover import build_query as _build_discover_query
+from canopy_ai.discover import map_response as _map_discover_response
 from canopy_ai.types import (
     ApprovalStatus,
     BudgetSnapshot,
+    DecideApprovalResult,
+    DiscoverArgs,
+    DiscoveredService,
     PayResult,
     PingResult,
 )
 
 _DEFAULT_BASE_URL = "https://www.trycanopy.ai"
 _DEFAULT_CHAIN_ID = 8453
-
-ToolFramework = Literal["openai", "anthropic", "vercel", "langchain"]
 
 
 class AsyncCanopy:
@@ -167,6 +170,7 @@ class AsyncCanopy:
             "decided_at": body.get("decided_at"),
             "expires_at": body["expires_at"],
             "transaction_id": body["transaction_id"],
+            "x_payment_header": body.get("x_payment_header"),
         }
 
     async def wait_for_approval(
@@ -184,6 +188,33 @@ class AsyncCanopy:
             if time.monotonic() >= deadline:
                 raise CanopyApprovalTimeoutError(approval_id, timeout_ms)
             await asyncio.sleep(poll_interval_ms / 1000)
+
+    async def approve(self, approval_id: str) -> DecideApprovalResult:
+        return await self._decide(approval_id, "approved")
+
+    async def deny(self, approval_id: str) -> DecideApprovalResult:
+        return await self._decide(approval_id, "denied")
+
+    async def _decide(
+        self, approval_id: str, decision: str
+    ) -> DecideApprovalResult:
+        from canopy_ai.errors import CanopyChatApprovalDisabledError
+
+        status, body = await self._request(
+            "POST",
+            f"/api/approvals/{approval_id}/decide-by-agent",
+            json={"decision": decision},
+            expect_statuses=[200, 403],
+        )
+        assert isinstance(body, dict)
+        if status == 403 and body.get("error") == "chat_approval_disabled":
+            raise CanopyChatApprovalDisabledError(approval_id, body.get("message"))
+        return {
+            "decision": body["decision"],
+            "transaction_id": body.get("transaction_id"),
+            "tx_hash": body.get("tx_hash"),
+            "signature": body.get("signature"),
+        }
 
     # ---------------------------------------------------------------- budget
 
@@ -209,6 +240,16 @@ class AsyncCanopy:
             "period_hours": int(body.get("period_hours", 24)),
             "period_resets_at": body.get("period_resets_at"),
         }
+
+    # -------------------------------------------------------------- discover
+
+    async def discover(self, **kwargs: Any) -> list[DiscoveredService]:
+        """List paid services the agent can call. See sync `Canopy.discover()`."""
+        args: DiscoverArgs = kwargs  # type: ignore[assignment]
+        qs = _build_discover_query(self.agent_id, args)
+        path = f"/api/services?{qs}" if qs else "/api/services"
+        _, body = await self._request("GET", path, expect_statuses=[200])
+        return _map_discover_response(body)
 
     # ------------------------------------------------------------------ ping
 
@@ -239,8 +280,21 @@ class AsyncCanopy:
         method: str = "GET",
         headers: dict[str, str] | None = None,
         content: Any = None,
+        wait_for_approval: bool | int = False,
     ) -> httpx.Response:
-        """Like httpx.request, but transparently handles HTTP 402 via x402."""
+        """Like httpx.request, but transparently handles HTTP 402 via x402.
+
+        On a pending_approval policy outcome:
+          - default: raises :class:`CanopyApprovalRequiredError`
+          - ``wait_for_approval=True`` or an int (ms): polls the approval
+            status, recovers the X-PAYMENT header on approve, retries the URL
+        """
+        from canopy_ai.errors import (
+            CanopyApprovalDeniedError,
+            CanopyApprovalExpiredError,
+            CanopyApprovalRequiredError,
+        )
+
         req_headers = dict(headers or {})
         first = await self._client.request(
             method, url, headers=req_headers, content=content
@@ -266,7 +320,7 @@ class AsyncCanopy:
         if not offer:
             return first
 
-        _, sign_body = await self._request(
+        sign_status, sign_body = await self._request(
             "POST",
             "/api/sign",
             json={
@@ -276,17 +330,57 @@ class AsyncCanopy:
                 "recipient_address": offer["payTo"],
                 "payload": {"x402": offer, "x402Version": reqs.get("x402Version", 1)},
             },
-            expect_statuses=[200],
+            expect_statuses=[200, 202],
         )
-        if not isinstance(sign_body, dict) or not sign_body.get("x_payment_header"):
+        assert isinstance(sign_body, dict)
+
+        x_payment_header: Any = None
+
+        if sign_status == 202:
+            approval_id = sign_body.get("approval_request_id")
+            transaction_id = sign_body.get("transaction_id")
+            if not approval_id or not transaction_id:
+                raise CanopyError("Sign returned 202 without approval_request_id")
+
+            if not wait_for_approval:
+                raise CanopyApprovalRequiredError(
+                    sign_body.get("reason", "Approval required"),
+                    approval_id=approval_id,
+                    transaction_id=transaction_id,
+                    recipient_name=sign_body.get("recipient_name"),
+                    amount_usd=sign_body.get("amount_usd"),
+                    agent_name=sign_body.get("agent_name"),
+                    expires_at=sign_body.get("expires_at"),
+                    chat_approval_enabled=sign_body.get("chat_approval_enabled", True),
+                )
+
+            timeout_ms = (
+                wait_for_approval
+                if isinstance(wait_for_approval, int) and wait_for_approval > 0
+                else 5 * 60 * 1000
+            )
+            decided = await self.wait_for_approval(approval_id, timeout_ms=timeout_ms)
+            if decided["status"] == "denied":
+                raise CanopyApprovalDeniedError(approval_id, transaction_id)
+            if decided["status"] == "expired":
+                raise CanopyApprovalExpiredError(approval_id, transaction_id)
+            x_payment_header = decided.get("x_payment_header")
+            if not x_payment_header:
+                refreshed = await self.get_approval_status(approval_id)
+                x_payment_header = refreshed.get("x_payment_header")
+        else:
+            x_payment_header = sign_body.get("x_payment_header")
+
+        if not x_payment_header:
             raise CanopyError("x402 signing returned no X-PAYMENT header")
 
-        header_val = sign_body["x_payment_header"]
-        if not isinstance(header_val, str):
-            header_val = base64.b64encode(json.dumps(header_val).encode()).decode()
+        if not isinstance(x_payment_header, str):
+            x_payment_header = base64.b64encode(
+                json.dumps(x_payment_header).encode()
+            ).decode()
 
         retry_headers = dict(req_headers)
-        retry_headers["X-PAYMENT"] = header_val
+        retry_headers["X-PAYMENT"] = x_payment_header
         return await self._client.request(
             method, url, headers=retry_headers, content=content
         )
@@ -391,6 +485,12 @@ def _map_sign_response(status: int, body: Any) -> PayResult:
             "approval_id": body.get("approval_request_id", ""),
             "transaction_id": body["transaction_id"],
             "reason": body.get("reason", "Approval required"),
+            "recipient_name": body.get("recipient_name"),
+            "recipient_address": body.get("recipient_address"),
+            "amount_usd": body.get("amount_usd"),
+            "agent_name": body.get("agent_name"),
+            "expires_at": body.get("expires_at"),
+            "chat_approval_enabled": body.get("chat_approval_enabled", True),
         }
     return {
         "status": "denied",

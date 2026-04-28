@@ -38,15 +38,14 @@ if (result.status === "allowed") {
 
 `pay()` returns one of three outcomes (`allowed` / `pending_approval` / `denied`) — they're return values, not exceptions, so an LLM can read them and decide what to do. HTTP/network failures still throw.
 
-## One-line setup
+## Setup
 
-In the dashboard, click **Install** on any agent to get a one-time code. Then in your project:
+Grab `CANOPY_API_KEY` from the dashboard's Settings page and the agent's `CANOPY_AGENT_ID` from its agent page. Drop both into your project's env:
 
 ```bash
-npx @canopy-ai/sdk init <code>
+CANOPY_API_KEY=ak_live_xxxxxxxxxxxxxxxx
+CANOPY_AGENT_ID=agt_xxxxxxxx
 ```
-
-That writes `CANOPY_API_KEY` and `CANOPY_AGENT_ID` to `.env.local` and pings to confirm the integration is live. No copy-paste.
 
 ## What the SDK gives you
 
@@ -57,10 +56,11 @@ Every SDK exposes the same surface:
 | `pay({ to, amountUsd })` | Issue a payment. |
 | `preview({ to, amountUsd })` | Dry-run the policy. Nothing signed or persisted. |
 | `fetch(url)` | Like `fetch`, but auto-pays HTTP 402 ([x402](https://x402.org)) responses. |
+| `discover({ category, query })` | Find x402 services the agent can call. Filtered by the agent's policy by default. |
 | `ping()` | Health check + the moment the dashboard shows your agent as connected. |
 | `budget()` | "How much can I spend right now?" — pre-flight cap snapshot. |
 | `waitForApproval(id)` | Block until a pending approval is decided. |
-| `getTools({ framework })` | LLM-ready tool definitions. Frameworks: `openai`, `anthropic`, `vercel`, `langchain`. |
+| `getTools()` | Canonical tool list (`canopy_pay`, `canopy_discover_services`) for any agent framework. |
 
 The package READMEs ([typescript](./typescript), [python](./python)) have copy-paste recipes for each framework.
 

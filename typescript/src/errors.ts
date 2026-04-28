@@ -50,3 +50,71 @@ export class CanopyApprovalTimeoutError extends CanopyError {
     this.approvalId = approvalId;
   }
 }
+
+export class CanopyApprovalRequiredError extends CanopyError {
+  approvalId: string;
+  transactionId: string;
+  recipientName: string | null;
+  amountUsd: number | null;
+  agentName: string | null;
+  expiresAt: string | null;
+  chatApprovalEnabled: boolean;
+
+  constructor(args: {
+    message: string;
+    approvalId: string;
+    transactionId: string;
+    recipientName?: string | null;
+    amountUsd?: number | null;
+    agentName?: string | null;
+    expiresAt?: string | null;
+    chatApprovalEnabled?: boolean;
+  }) {
+    super(args.message);
+    this.name = "CanopyApprovalRequiredError";
+    this.approvalId = args.approvalId;
+    this.transactionId = args.transactionId;
+    this.recipientName = args.recipientName ?? null;
+    this.amountUsd = args.amountUsd ?? null;
+    this.agentName = args.agentName ?? null;
+    this.expiresAt = args.expiresAt ?? null;
+    this.chatApprovalEnabled = args.chatApprovalEnabled ?? true;
+  }
+}
+
+export class CanopyApprovalDeniedError extends CanopyError {
+  approvalId: string;
+  transactionId: string;
+
+  constructor(approvalId: string, transactionId: string) {
+    super(`Approval ${approvalId} was denied`);
+    this.name = "CanopyApprovalDeniedError";
+    this.approvalId = approvalId;
+    this.transactionId = transactionId;
+  }
+}
+
+export class CanopyApprovalExpiredError extends CanopyError {
+  approvalId: string;
+  transactionId: string;
+
+  constructor(approvalId: string, transactionId: string) {
+    super(`Approval ${approvalId} expired before a decision was made`);
+    this.name = "CanopyApprovalExpiredError";
+    this.approvalId = approvalId;
+    this.transactionId = transactionId;
+  }
+}
+
+export class CanopyChatApprovalDisabledError extends CanopyError {
+  approvalId: string;
+
+  constructor(approvalId: string, message?: string) {
+    super(
+      message ??
+        `Chat-based approval is disabled for this policy. Approve in the Canopy dashboard.`,
+    );
+    this.name = "CanopyChatApprovalDisabledError";
+    this.approvalId = approvalId;
+  }
+}

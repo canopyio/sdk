@@ -3,16 +3,22 @@ import { Canopy } from "../src/index.js";
 import { Transport } from "../src/transport.js";
 
 /**
- * Each framework adapter should:
- *  1. Produce a tool description with the canopy_pay name and the {to, amountUsd} schema.
- *  2. Carry an executor that calls canopy.pay() — verified by intercepting the
- *     underlying HTTP request and asserting the wire body matches.
+ * `canopy.getTools()` returns canonical tools — { name, description,
+ * parameters (JSON Schema), execute }. We assert the shape and that the
+ * `execute` callable hits the right wire path through the SDK.
  */
 
-function fakeTransport(captured: { body?: unknown; path?: string }) {
+function fakeTransport(captured: { body?: unknown; path?: string; url?: string }) {
   const fakeFetch: typeof fetch = async (input, init) => {
     captured.body = init?.body ? JSON.parse(init.body as string) : undefined;
-    captured.path = typeof input === "string" ? input : input.toString();
+    captured.url = typeof input === "string" ? input : input.toString();
+    captured.path = new URL(captured.url).pathname + new URL(captured.url).search;
+    if (captured.path?.startsWith("/api/services")) {
+      return new Response(JSON.stringify({ services: [], count: 0 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
     return new Response(
       JSON.stringify({
         signature: "0xsig",
@@ -28,91 +34,86 @@ function fakeTransport(captured: { body?: unknown; path?: string }) {
 }
 
 function newCanopy(transport: Transport) {
-  // Construct Canopy normally, then swap its transport via a private cast — we
-  // only need the executors to use a controllable transport for the wire-body
-  // assertions below.
   const canopy = new Canopy({ apiKey: "ak_test_x", agentId: "agt_test" });
   (canopy as unknown as { transport: Transport }).transport = transport;
   return canopy;
 }
 
-describe("openai adapter", () => {
-  it("returns the canopy_pay tool with correct shape", () => {
+describe("canopy.getTools()", () => {
+  it("returns canonical CanopyTool[] for pay, discover, approve, deny", () => {
     const canopy = new Canopy({ apiKey: "ak_test_x", agentId: "agt_test" });
-    const tools = canopy.getTools({ framework: "openai" });
-    expect(tools).toHaveLength(1);
-    expect(tools[0].type).toBe("function");
-    expect(tools[0].function.name).toBe("canopy_pay");
-    expect(tools[0].function.parameters.required).toEqual(["to", "amountUsd"]);
+    const tools = canopy.getTools();
+    expect(tools).toHaveLength(4);
+    const names = tools.map((t) => t.name);
+    expect(names).toEqual([
+      "canopy_pay",
+      "canopy_discover_services",
+      "canopy_approve",
+      "canopy_deny",
+    ]);
+    for (const t of tools) {
+      expect(typeof t.name).toBe("string");
+      expect(typeof t.description).toBe("string");
+      expect(typeof t.execute).toBe("function");
+      expect(t.parameters).toMatchObject({ type: "object" });
+    }
   });
 
-  it("execute() calls /api/sign with the same body as pay()", async () => {
-    const captured: { body?: unknown; path?: string } = {};
+  it("canopy_pay parameters require `to` and `amountUsd`", () => {
+    const canopy = new Canopy({ apiKey: "ak_test_x", agentId: "agt_test" });
+    const [pay] = canopy.getTools();
+    expect((pay.parameters as { required?: string[] }).required).toEqual(["to", "amountUsd"]);
+  });
+
+  it("canopy_pay.execute() hits /api/sign with the wire body", async () => {
+    const captured: { body?: unknown; url?: string; path?: string } = {};
     const canopy = newCanopy(fakeTransport(captured));
-    const [tool] = canopy.getTools({ framework: "openai" });
-    await tool.execute({ to: "0x" + "1".repeat(40), amountUsd: 0.1 });
+    const [pay] = canopy.getTools();
+    await pay.execute({ to: "0x" + "1".repeat(40), amountUsd: 0.1 });
+    expect(captured.path).toBe("/api/sign");
     const body = captured.body as Record<string, unknown>;
     expect(body.agent_id).toBe("agt_test");
     expect(body.amount_usd).toBe(0.1);
     expect(body.type).toBe("raw_transaction");
   });
-});
 
-describe("anthropic adapter", () => {
-  it("returns input_schema (Anthropic shape)", () => {
-    const canopy = new Canopy({ apiKey: "ak_test_x", agentId: "agt_test" });
-    const tools = canopy.getTools({ framework: "anthropic" });
-    expect(tools).toHaveLength(1);
-    expect(tools[0].name).toBe("canopy_pay");
-    expect(tools[0].input_schema).toBeDefined();
-    expect(tools[0].input_schema.required).toEqual(["to", "amountUsd"]);
-  });
-
-  it("execute() calls /api/sign", async () => {
-    const captured: { body?: unknown } = {};
+  it("canopy_discover_services.execute() hits /api/services with filters", async () => {
+    const captured: { body?: unknown; url?: string; path?: string } = {};
     const canopy = newCanopy(fakeTransport(captured));
-    const [tool] = canopy.getTools({ framework: "anthropic" });
-    const result = await tool.execute({ to: "0x" + "2".repeat(40), amountUsd: 0.25 });
-    expect(result.status).toBe("allowed");
-    expect((captured.body as Record<string, unknown>).amount_usd).toBe(0.25);
+    const tools = canopy.getTools();
+    const discover = tools.find((t) => t.name === "canopy_discover_services");
+    expect(discover).toBeDefined();
+    const result = await discover!.execute({ category: "data", query: "orderbook" });
+    expect(captured.path).toContain("/api/services");
+    expect(captured.path).toContain("category=data");
+    expect(captured.path).toContain("q=orderbook");
+    expect(captured.path).toContain("agent_id=agt_test");
+    expect(Array.isArray(result)).toBe(true);
   });
-});
 
-describe("vercel adapter", () => {
-  it("returns a Record keyed by tool name (Vercel shape)", () => {
+  it("OpenAI wrap recipe produces a valid Chat Completions tool shape", () => {
     const canopy = new Canopy({ apiKey: "ak_test_x", agentId: "agt_test" });
-    const tools = canopy.getTools({ framework: "vercel" });
-    expect(Object.keys(tools)).toEqual(["canopy_pay"]);
-    expect(tools.canopy_pay.parameters.required).toEqual(["to", "amountUsd"]);
+    const tools = canopy.getTools();
+    const openai = tools.map(({ execute, ...rest }) => ({ type: "function", function: rest }));
+    expect(openai[0]).toMatchObject({
+      type: "function",
+      function: { name: "canopy_pay" },
+    });
+    expect(openai[0].function).not.toHaveProperty("execute");
   });
 
-  it("execute() calls /api/sign", async () => {
-    const captured: { body?: unknown } = {};
-    const canopy = newCanopy(fakeTransport(captured));
-    const tools = canopy.getTools({ framework: "vercel" });
-    await tools.canopy_pay.execute({ to: "0x" + "3".repeat(40), amountUsd: 0.5 });
-    expect((captured.body as Record<string, unknown>).amount_usd).toBe(0.5);
-  });
-});
-
-describe("langchain adapter", () => {
-  it("returns DynamicStructuredTool config with schema + func", () => {
+  it("Anthropic wrap recipe produces a valid Messages tool shape", () => {
     const canopy = new Canopy({ apiKey: "ak_test_x", agentId: "agt_test" });
-    const tools = canopy.getTools({ framework: "langchain" });
-    expect(tools).toHaveLength(1);
-    expect(tools[0].name).toBe("canopy_pay");
-    expect(tools[0].schema.required).toEqual(["to", "amountUsd"]);
-    expect(typeof tools[0].func).toBe("function");
-  });
-
-  it("func() returns a JSON-stringified PayResult", async () => {
-    const captured: { body?: unknown } = {};
-    const canopy = newCanopy(fakeTransport(captured));
-    const [tool] = canopy.getTools({ framework: "langchain" });
-    const out = await tool.func({ to: "0x" + "4".repeat(40), amountUsd: 1 });
-    expect(typeof out).toBe("string");
-    const parsed = JSON.parse(out);
-    expect(parsed.status).toBe("allowed");
-    expect(parsed.txHash).toBe("0xhash");
+    const tools = canopy.getTools();
+    const anthropic = tools.map(({ execute, parameters, ...rest }) => ({
+      ...rest,
+      input_schema: parameters,
+    }));
+    expect(anthropic[0]).toMatchObject({
+      name: "canopy_pay",
+      input_schema: { type: "object" },
+    });
+    expect(anthropic[0]).not.toHaveProperty("parameters");
+    expect(anthropic[0]).not.toHaveProperty("execute");
   });
 });

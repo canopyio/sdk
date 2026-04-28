@@ -1,0 +1,55 @@
+{
+  "name": "discover_services_filtered",
+  "description": "canopy.discover({category, query}) hits /api/services with the right filters and the auto-attached agent_id, and returns the parsed list.",
+  "config": {
+    "apiKey": "ak_live_test",
+    "agentId": "agt_test",
+    "baseUrl": "https://api.canopy.test"
+  },
+  "call": {
+    "method": "discover",
+    "args": { "category": "data", "query": "orderbook" }
+  },
+  "httpExchange": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.canopy.test/api/services?category=data&q=orderbook&agent_id=agt_test",
+        "headers": {
+          "authorization": "Bearer ak_live_test"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "services": [
+            {
+              "slug": "agentic.market/coinglass-orderbook",
+              "name": "Coinglass Orderbook Feed",
+              "description": "Real-time order book depth across major exchanges.",
+              "url": "https://api.coinglass.example/v1/orderbook",
+              "category": "data",
+              "paymentProtocol": "x402",
+              "typicalAmountUsd": 0.01,
+              "payTo": "0x2222222222222222222222222222222222222222",
+              "policyAllowed": true
+            }
+          ],
+          "count": 1
+        }
+      }
+    }
+  ],
+  "expectedReturn": [
+    {
+      "slug": "agentic.market/coinglass-orderbook",
+      "name": "Coinglass Orderbook Feed",
+      "url": "https://api.coinglass.example/v1/orderbook",
+      "category": "data",
+      "paymentProtocol": "x402",
+      "typicalAmountUsd": 0.01,
+      "payTo": "0x2222222222222222222222222222222222222222",
+      "policyAllowed": true
+    }
+  ]
+}

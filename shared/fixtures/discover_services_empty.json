@@ -1,0 +1,26 @@
+{
+  "name": "discover_services_empty",
+  "description": "Empty registry returns {services: [], count: 0} (not a 404). SDK returns an empty array.",
+  "config": {
+    "apiKey": "ak_live_test",
+    "agentId": "agt_test",
+    "baseUrl": "https://api.canopy.test"
+  },
+  "call": {
+    "method": "discover",
+    "args": { "category": "compute" }
+  },
+  "httpExchange": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.canopy.test/api/services?category=compute&agent_id=agt_test"
+      },
+      "response": {
+        "status": 200,
+        "body": { "services": [], "count": 0 }
+      }
+    }
+  ],
+  "expectedReturn": []
+}

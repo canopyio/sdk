@@ -1,5 +1,13 @@
 import type { Transport } from "./transport.js";
-import { CanopyConfigError, CanopyError } from "./errors.js";
+import {
+  CanopyApprovalDeniedError,
+  CanopyApprovalExpiredError,
+  CanopyApprovalRequiredError,
+  CanopyConfigError,
+  CanopyError,
+} from "./errors.js";
+import { getApprovalStatus, waitForApproval } from "./approval.js";
+import type { CanopyFetchOptions } from "./types.js";
 
 /**
  * x402 payment requirements returned in a 402 response body.
@@ -21,23 +29,38 @@ interface X402Requirements {
   }>;
 }
 
+interface SignResponseBody {
+  x_payment_header?: string;
+  transaction_id: string;
+  error?: string;
+  // pending_approval enrichment
+  status?: string;
+  reason?: string;
+  approval_request_id?: string;
+  recipient_name?: string | null;
+  recipient_address?: string | null;
+  amount_usd?: number | null;
+  agent_name?: string | null;
+  expires_at?: string | null;
+  chat_approval_enabled?: boolean;
+}
+
 /**
- * fetch() wrapper that auto-handles HTTP 402 by delegating signing to
- * canopy-app's `/api/sign` (type="eip3009") and retrying with the
- * `X-PAYMENT` header.
+ * fetch() wrapper that auto-handles HTTP 402 via canopy-app's `/api/sign`.
  *
- * NOTE: the full x402 → EIP-3009 typed-data construction requires contract
- * metadata (USDC domain separator on each network) and nonce generation.
- * The server-side is the natural place for that; the SDK just forwards the
- * 402 body in a `payload.x402` envelope and expects the server to return
- * the fully-encoded `X-PAYMENT` base64 string. Server support lands with
- * the SDK rollout.
+ * Three policy outcomes the server can return:
+ *   - 200 allowed → SDK retries with X-PAYMENT (existing happy path)
+ *   - 202 pending_approval → SDK either throws CanopyApprovalRequiredError
+ *     (default) or, with `{ waitForApproval: true | <ms> }`, polls the
+ *     status endpoint, recovers the X-PAYMENT header on approve, and retries
+ *   - 403 denied → throws via the transport
  */
 export async function canopyFetch(
   transport: Transport,
   agentId: string | undefined,
   url: string,
   init?: RequestInit,
+  opts: CanopyFetchOptions = {},
 ): Promise<Response> {
   const first = await fetch(url, init);
   if (first.status !== 402) return first;
@@ -57,11 +80,7 @@ export async function canopyFetch(
   );
   if (!offer) return first;
 
-  const { body: signBody } = await transport.request<{
-    x_payment_header?: string;
-    transaction_id: string;
-    error?: string;
-  }>({
+  const { status: signStatus, body: signBody } = await transport.request<SignResponseBody>({
     method: "POST",
     path: "/api/sign",
     body: {
@@ -71,14 +90,60 @@ export async function canopyFetch(
       recipient_address: offer.payTo,
       payload: { x402: offer, x402Version: reqs.x402Version ?? 1 },
     },
-    expectStatuses: [200],
+    expectStatuses: [200, 202],
   });
 
-  if (!signBody.x_payment_header) {
+  let xPaymentHeader: string | null = null;
+
+  if (signStatus === 202) {
+    const approvalId = signBody.approval_request_id;
+    const transactionId = signBody.transaction_id;
+    if (!approvalId) {
+      throw new CanopyError("Sign returned 202 without approval_request_id");
+    }
+
+    if (!opts.waitForApproval) {
+      throw new CanopyApprovalRequiredError({
+        message: signBody.reason ?? "Approval required",
+        approvalId,
+        transactionId,
+        recipientName: signBody.recipient_name ?? null,
+        amountUsd: signBody.amount_usd ?? null,
+        agentName: signBody.agent_name ?? null,
+        expiresAt: signBody.expires_at ?? null,
+        chatApprovalEnabled: signBody.chat_approval_enabled ?? true,
+      });
+    }
+
+    const timeoutMs =
+      typeof opts.waitForApproval === "number"
+        ? opts.waitForApproval
+        : 5 * 60 * 1000;
+    const decided = await waitForApproval(transport, approvalId, { timeoutMs });
+
+    if (decided.status === "denied") {
+      throw new CanopyApprovalDeniedError(approvalId, transactionId);
+    }
+    if (decided.status === "expired") {
+      throw new CanopyApprovalExpiredError(approvalId, transactionId);
+    }
+    // approved
+    if (decided.xPaymentHeader) {
+      xPaymentHeader = decided.xPaymentHeader;
+    } else {
+      // Status race: poll once more for a populated header.
+      const refreshed = await getApprovalStatus(transport, approvalId);
+      xPaymentHeader = refreshed.xPaymentHeader ?? null;
+    }
+  } else {
+    xPaymentHeader = signBody.x_payment_header ?? null;
+  }
+
+  if (!xPaymentHeader) {
     throw new CanopyError("x402 signing returned no X-PAYMENT header");
   }
 
   const retryHeaders = new Headers(init?.headers ?? {});
-  retryHeaders.set("X-PAYMENT", signBody.x_payment_header);
+  retryHeaders.set("X-PAYMENT", xPaymentHeader);
   return fetch(url, { ...init, headers: retryHeaders });
 }

@@ -121,6 +121,9 @@ def test_fixture(fixture: dict[str, Any]) -> None:
     try:
         if method == "fetch":
             fetch_result = canopy.fetch(args["url"])
+        elif method == "discover":
+            kwargs = {_CAMEL_TO_SNAKE.sub("_", k).lower(): v for k, v in args.items()}
+            pay_result = canopy.discover(**kwargs)
         else:
             # Translate camelCase SDK args to snake_case kwargs.
             kwargs = {_CAMEL_TO_SNAKE.sub("_", k).lower(): v for k, v in args.items()}

@@ -65,7 +65,7 @@ Any MCP host with a `mcpServers` config block will work with the same shape — 
 
 ## Available tools
 
-Six tools covering the full payment lifecycle:
+Seven tools covering discovery + the full payment lifecycle:
 
 ### `canopy_pay`
 
@@ -169,14 +169,49 @@ Pre-flight cap snapshot — useful for the LLM to plan ahead ("I have $4.30 left
 
 When no policy is bound to the agent, `capUsd` and `remainingUsd` are `null` (no cap).
 
+### `canopy_discover_services`
+
+List paid services the agent can call. Filter by category (`data`, `api`, `compute`, …) or a free-text query. Pairs with `canopy_pay` (or `canopy.fetch` from your own code): the LLM discovers a service, then pays its `payTo` address or hits its `url`.
+
+**Arguments**
+```json
+{ "category": "data", "query": "orderbook", "limit": 20 }
+```
+
+All optional. With no args, returns the top services the agent's policy permits.
+
+**Returns**
+```json
+{
+  "services": [
+    {
+      "slug": "agentic.market/coinglass-orderbook",
+      "name": "Coinglass Orderbook Feed",
+      "description": "Real-time order book depth.",
+      "url": "https://api.coinglass.example/v1/orderbook",
+      "category": "data",
+      "paymentProtocol": "x402",
+      "typicalAmountUsd": 0.01,
+      "payTo": "0x...",
+      "policyAllowed": true
+    }
+  ],
+  "count": 1
+}
+```
+
+If the agent's policy has an allowlist, results are filtered to allowed payees by default.
+
 ## How the LLM experiences it
 
-Once the server is loaded, the host exposes all six tools in its normal tool UI. The LLM decides when to call `canopy_pay`; the host runs the call; Canopy's policy engine decides `allowed` / `pending_approval` / `denied`; the result comes back as tool output the LLM reads. A typical prompt flow:
+Once the server is loaded, the host exposes all seven tools in its normal tool UI. The LLM decides when to call them; the host runs them; results come back as tool output the LLM reads. A typical prompt flow:
 
-> **You:** send $0.10 to 0x1234…
-> **LLM:** *[calls `canopy_pay({ to: "0x1234…", amountUsd: 0.10 })`]*
+> **You:** find a data feed and pay for BTC orderbook depth.
+> **LLM:** *[calls `canopy_discover_services({ category: "data", query: "orderbook" })`]*
+> *[tool returns 3 services with URLs and prices]*
+> **LLM:** *[picks the cheapest, calls `canopy_pay({ to: "0x...", amountUsd: 0.01 })`]*
 > *[tool returns `{ "status": "allowed", "txHash": "0xabc…" }`]*
-> **LLM:** Done. Transaction: 0xabc…
+> **LLM:** Paid Coinglass $0.01 for the feed. Here's the depth: …
 
 If the amount exceeds the approval threshold, the LLM sees `pending_approval` and will usually tell the user to approve in the dashboard. Approvals happen in the Canopy web dashboard, not inside the MCP host.
 
@@ -218,7 +253,7 @@ Use a test-mode key (`ak_test_…`) so you don't pollute production data.
 
 ## What's under the hood
 
-`@canopy-ai/mcp` is a thin wrapper around [`@canopy-ai/sdk`](../typescript). It's an stdio MCP server (the official `@modelcontextprotocol/sdk`) that exposes `canopy.pay`, `canopy.preview`, `canopy.getApprovalStatus`, `canopy.waitForApproval`, `canopy.ping`, and `canopy.budget` as MCP tools. No custody — the server just proxies to Canopy's API with your key.
+`@canopy-ai/mcp` is a thin wrapper around [`@canopy-ai/sdk`](../typescript). It's an stdio MCP server (the official `@modelcontextprotocol/sdk`) that exposes `canopy.pay`, `canopy.preview`, `canopy.getApprovalStatus`, `canopy.waitForApproval`, `canopy.ping`, `canopy.budget`, and `canopy.discover` as MCP tools. No custody — the server just proxies to Canopy's API with your key.
 
 ## Version
 

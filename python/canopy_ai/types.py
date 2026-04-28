@@ -1,4 +1,4 @@
-from typing import Literal, TypedDict, Union
+from typing import Any, Callable, Literal, TypedDict, Union
 
 from typing_extensions import NotRequired
 
@@ -19,6 +19,15 @@ class PayResultPending(TypedDict):
     approval_id: str
     transaction_id: str
     reason: str
+    #: Resolved name of the recipient from the Canopy registry, when available.
+    recipient_name: str | None
+    recipient_address: str | None
+    amount_usd: float | None
+    agent_name: str | None
+    #: ISO timestamp; the approval is auto-cancelled after this.
+    expires_at: str | None
+    #: When False, calling canopy.approve()/deny() will fail with CanopyChatApprovalDisabledError.
+    chat_approval_enabled: bool
 
 
 class PayResultDenied(TypedDict):
@@ -35,6 +44,15 @@ class ApprovalStatus(TypedDict):
     decided_at: str | None
     expires_at: str
     transaction_id: str
+    #: For x402 transactions resumed after approval, the X-PAYMENT header to retry the resource URL.
+    x_payment_header: str | None
+
+
+class DecideApprovalResult(TypedDict):
+    decision: Literal["approved", "denied"]
+    transaction_id: str | None
+    tx_hash: str | None
+    signature: str | None
 
 
 class PingAgent(TypedDict):
@@ -71,3 +89,46 @@ class BudgetSnapshot(TypedDict):
     #: Timestamp when the oldest spend in the current window ages out;
     #: None if nothing has been spent yet.
     period_resets_at: str | None
+
+
+class DiscoverArgs(TypedDict, total=False):
+    #: Filter by one or more category slugs.
+    category: str | list[str]
+    #: Free-text match on service name + description.
+    query: str
+    #: Include verified=False long-tail entries. Default False.
+    include_unverified: bool
+    #: Include policy-blocked services with policy_allowed=False. Default False.
+    include_blocked: bool
+    #: Default 20, capped at 50 server-side.
+    limit: int
+
+
+class DiscoveredService(TypedDict):
+    slug: str
+    name: str
+    description: str | None
+    #: The endpoint to hit with `canopy.fetch(url)`. May be None.
+    url: str | None
+    category: str
+    payment_protocol: str | None
+    #: Hint cost — actual price comes from the 402 response.
+    typical_amount_usd: float | None
+    #: On-chain payee address.
+    pay_to: str
+    #: False only when include_blocked=True returned a service the policy blocks.
+    policy_allowed: bool
+
+
+class CanopyTool(TypedDict):
+    """Canonical tool shape returned by `canopy.get_tools()`.
+
+    `parameters` is a JSON Schema dict. `execute` is the bound implementation
+    that calls the underlying SDK method. Sync clients return a sync callable;
+    async clients return a coroutine function.
+    """
+
+    name: str
+    description: str
+    parameters: dict[str, Any]
+    execute: Callable[..., Any]

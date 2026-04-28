@@ -1,21 +1,34 @@
 import time
-from typing import Any, Literal
+from typing import Any
 
 import httpx
 
-from canopy_ai.approval import get_approval_status, wait_for_approval
+from canopy_ai.approval import (
+    approve as _approve,
+    deny as _deny,
+    get_approval_status,
+    wait_for_approval,
+)
 from canopy_ai.dashboard_urls import agents_url, api_keys_url
+from canopy_ai.discover import discover as discover_impl
 from canopy_ai.encoding import USDC_BASE, encode_erc20_transfer, is_entity_slug, usd_to_usdc_units
 from canopy_ai.errors import CanopyConfigError
 from canopy_ai.fetch import canopy_fetch
 from canopy_ai.resolve import resolve_entity
 from canopy_ai.transport import Transport
-from canopy_ai.types import ApprovalStatus, BudgetSnapshot, PayResult, PingResult
+from canopy_ai.types import (
+    ApprovalStatus,
+    BudgetSnapshot,
+    CanopyTool,
+    DecideApprovalResult,
+    DiscoverArgs,
+    DiscoveredService,
+    PayResult,
+    PingResult,
+)
 
 _DEFAULT_BASE_URL = "https://www.trycanopy.ai"
 _DEFAULT_CHAIN_ID = 8453
-
-ToolFramework = Literal["openai", "anthropic", "vercel", "langchain"]
 
 
 class Canopy:
@@ -144,6 +157,12 @@ class Canopy:
                 "approval_id": body.get("approval_request_id", ""),
                 "transaction_id": body["transaction_id"],
                 "reason": body.get("reason", "Approval required"),
+                "recipient_name": body.get("recipient_name"),
+                "recipient_address": body.get("recipient_address"),
+                "amount_usd": body.get("amount_usd"),
+                "agent_name": body.get("agent_name"),
+                "expires_at": body.get("expires_at"),
+                "chat_approval_enabled": body.get("chat_approval_enabled", True),
             }
         # 403
         return {
@@ -169,6 +188,22 @@ class Canopy:
             poll_interval_ms=poll_interval_ms,
         )
 
+    def approve(self, approval_id: str) -> DecideApprovalResult:
+        """
+        Mark a pending approval as approved. Call this when the user
+        explicitly approves a transaction in chat (e.g. they replied "yes",
+        "approve"). The org's policy must have ``chat_approval_enabled = True``
+        (default True), or :class:`CanopyChatApprovalDisabledError` is raised.
+        """
+        return _approve(self._transport, approval_id)
+
+    def deny(self, approval_id: str) -> DecideApprovalResult:
+        """
+        Mark a pending approval as denied. Call this when the user explicitly
+        denies a transaction in chat (e.g. they replied "no", "cancel").
+        """
+        return _deny(self._transport, approval_id)
+
     def fetch(
         self,
         url: str,
@@ -176,6 +211,7 @@ class Canopy:
         method: str = "GET",
         headers: dict[str, str] | None = None,
         content: Any = None,
+        wait_for_approval: bool | int = False,
     ) -> httpx.Response:
         return canopy_fetch(
             self._transport,
@@ -185,12 +221,29 @@ class Canopy:
             headers=headers,
             content=content,
             http_client=self._transport.client,
+            wait_for_approval=wait_for_approval,
         )
 
-    def get_tools(self, *, framework: ToolFramework) -> Any:
-        from canopy_ai.integrations import get_tools_for
+    def get_tools(self) -> list[CanopyTool]:
+        """
+        Returns the SDK's canonical tool list (`canopy_pay`,
+        `canopy_discover_services`) as
+        ``[{name, description, parameters: JSONSchema, execute}]``. Works
+        directly with LangChain, MCP, and most agent frameworks. For OpenAI /
+        Anthropic, see the README for the one-line wrap recipe.
+        """
+        from canopy_ai.integrations import get_tools
 
-        return get_tools_for(self, framework)
+        return get_tools(self)
+
+    def discover(self, **kwargs: Any) -> list[DiscoveredService]:
+        """
+        Discover paid services the agent can call. Filter by category, query,
+        protocol, etc. By default, only services on the agent's policy
+        allowlist are returned (when an allowlist is set).
+        """
+        args: DiscoverArgs = kwargs  # type: ignore[assignment]
+        return discover_impl(self._transport, self.agent_id, args)
 
     def budget(self) -> BudgetSnapshot:
         """

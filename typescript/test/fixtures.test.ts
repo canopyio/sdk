@@ -9,7 +9,8 @@ interface Fixture {
   config: { apiKey: string; agentId?: string; baseUrl: string };
   call:
     | { method: "pay" | "preview"; args: Record<string, unknown> }
-    | { method: "fetch"; args: { url: string; init?: { method?: string; body?: string } } };
+    | { method: "fetch"; args: { url: string; init?: { method?: string; body?: string } } }
+    | { method: "discover"; args: Record<string, unknown> };
   httpExchange: Array<{
     request: {
       method: string;
@@ -158,6 +159,10 @@ describe("fixture replay", () => {
         } else if (fixture.call.method === "fetch") {
           const args = fixture.call.args as { url: string; init?: RequestInit };
           fetchResult = await canopy.fetch(args.url, args.init);
+        } else if (fixture.call.method === "discover") {
+          payResult = await canopy.discover(
+            fixture.call.args as Parameters<typeof canopy.discover>[0],
+          );
         } else {
           throw new Error(`Fixture ${fixture.name}: unknown call method`);
         }

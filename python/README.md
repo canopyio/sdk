@@ -10,15 +10,11 @@ Python 3.10+. Uses `httpx` for transport. `mypy --strict` passes on the library.
 
 ## Setup in 30 seconds
 
-The fast path, after you've signed up at <https://www.trycanopy.ai> and added an agent: click **Install** on the agent's page in the dashboard to get a one-time code, then in your project (any directory):
+After you've signed up at <https://www.trycanopy.ai> and added an agent:
 
-```bash
-npx @canopy-ai/sdk init <code>
-```
-
-That writes `CANOPY_API_KEY` and `CANOPY_AGENT_ID` to `.env.local` and pings to confirm the connection. (Yes, even for Python — the CLI is small and language-agnostic. The dashboard flips your agent to **Connected** in real time.)
-
-Prefer manual setup? Dashboard → Settings → API Keys → Create (`ak_live_…`), then Dashboard → Agents → copy the `agt_…` id:
+1. Dashboard → **Settings** → copy your org API key (`ak_live_…`).
+2. Dashboard → **Agents** → copy the agent's `agt_…` id.
+3. Drop both into your environment:
 
 ```bash
 export CANOPY_API_KEY=ak_live_xxxxxxxxxxxxxxxx
@@ -68,39 +64,36 @@ async def main():
 asyncio.run(main())
 ```
 
-## Plug Canopy into your agent
+## Discover paid services at runtime
 
-Drop a payment tool into whatever framework you're using. `get_tools(framework=...)` returns ready-to-bind definitions; the `execute` / `func` callable is wired to `canopy.pay()`.
-
-### Anthropic
+Don't hardcode URLs. Let the agent find x402 services it can call:
 
 ```python
-import os
-from anthropic import Anthropic
-from canopy_ai import Canopy
+services = canopy.discover(category="data", query="orderbook")
+# → [{ "name", "description", "url", "pay_to", "typical_amount_usd",
+#      "policy_allowed", ... }]
 
-canopy = Canopy(
-    api_key=os.environ["CANOPY_API_KEY"],
-    agent_id=os.environ["CANOPY_AGENT_ID"],
-)
-client = Anthropic()
-
-tools = canopy.get_tools(framework="anthropic")
-schema_tools = [{k: v for k, v in t.items() if k != "execute"} for t in tools]
-
-msg = client.messages.create(
-    model="claude-sonnet-4-6",
-    max_tokens=1024,
-    tools=schema_tools,
-    messages=[{"role": "user", "content": "Pay 10 cents to agentic.market/anthropic"}],
-)
-
-# Dispatch any tool_use blocks back through Canopy
-for block in msg.content:
-    if block.type == "tool_use":
-        tool = next(t for t in tools if t["name"] == block.name)
-        tool["execute"](dict(block.input))
+feed = services[0]
+if feed["policy_allowed"] and feed["url"]:
+    res = canopy.fetch(feed["url"])   # 402 → auto-paid → 200 with content
 ```
+
+`discover()` queries Canopy's registry of x402 services. The agent's policy filters the results — if the policy has an allowlist, only services on that list are returned. Pass `include_blocked=True` to see blocked services too (with `policy_allowed: False`).
+
+## Plug Canopy into your agent
+
+`canopy.get_tools()` returns the canonical tool list — `canopy_pay` and `canopy_discover_services` — as `[{ name, description, parameters: JSONSchema, execute }]`. Most frameworks consume this shape directly. For OpenAI / Anthropic, wrap with a one-line transform.
+
+| Framework | Fit | Recipe |
+|---|---|---|
+| LangChain | Direct (JSON Schema dict, no Pydantic required) | [↓](#langchain) |
+| LangGraph | Direct (via LangChain `StructuredTool`) | [↓](#langgraph) |
+| OpenAI Agents SDK | Direct (decorator pattern) | [↓](#openai-agents-sdk) |
+| OpenAI Chat Completions | One-line wrap | [↓](#openai-chat-completions) |
+| Anthropic Messages | One-line wrap | [↓](#anthropic) |
+| MCP host (Claude Desktop, Cursor, Cline, Windsurf) | No code — install [`@canopy-ai/mcp`](../mcp) | — |
+
+If your framework isn't listed but accepts a tool definition with JSON Schema + a Python callable, our canonical shape works directly. If it expects a different envelope (like OpenAI/Anthropic), wrap with a list-comprehension.
 
 ### LangChain
 
@@ -108,18 +101,17 @@ for block in msg.content:
 from langchain_core.tools import StructuredTool
 from canopy_ai import Canopy
 
-canopy = Canopy(
-    api_key=os.environ["CANOPY_API_KEY"],
-    agent_id=os.environ["CANOPY_AGENT_ID"],
-)
+canopy = Canopy(api_key=os.environ["CANOPY_API_KEY"], agent_id=os.environ["CANOPY_AGENT_ID"])
 
-[spec] = canopy.get_tools(framework="langchain")
-pay_tool = StructuredTool.from_function(
-    func=spec["func"],
-    name=spec["name"],
-    description=spec["description"],
-    args_schema=spec["schema"],   # JSON Schema dict — no Pydantic required
-)
+lc_tools = [
+    StructuredTool.from_function(
+        func=t["execute"],
+        name=t["name"],
+        description=t["description"],
+        args_schema=t["parameters"],   # JSON Schema dict — no Pydantic required
+    )
+    for t in canopy.get_tools()
+]
 ```
 
 ### LangGraph
@@ -128,9 +120,11 @@ pay_tool = StructuredTool.from_function(
 from langgraph.prebuilt import create_react_agent
 from langchain_openai import ChatOpenAI
 
-# Build pay_tool exactly as in the LangChain example above, then:
-agent = create_react_agent(ChatOpenAI(model="gpt-4o"), tools=[pay_tool])
-agent.invoke({"messages": [{"role": "user", "content": "Send 10 cents to 0x1234..."}]})
+# Build lc_tools as in the LangChain example above, then:
+agent = create_react_agent(ChatOpenAI(model="gpt-4o"), tools=lc_tools)
+agent.invoke({
+    "messages": [{"role": "user", "content": "Find a data feed and pull BTC orderbook depth."}],
+})
 ```
 
 ### OpenAI Agents SDK
@@ -140,44 +134,89 @@ import os
 from agents import Agent, Runner, function_tool
 from canopy_ai import Canopy
 
-canopy = Canopy(
-    api_key=os.environ["CANOPY_API_KEY"],
-    agent_id=os.environ["CANOPY_AGENT_ID"],
-)
+canopy = Canopy(api_key=os.environ["CANOPY_API_KEY"], agent_id=os.environ["CANOPY_AGENT_ID"])
 
 @function_tool
 def canopy_pay(to: str, amount_usd: float):
     """Send a USD payment from the org treasury."""
     return canopy.pay(to=to, amount_usd=amount_usd)
 
-agent = Agent(name="Treasurer", instructions="Pay recipients when asked.", tools=[canopy_pay])
-print(Runner.run_sync(agent, "Send 10 cents to 0x1234...").final_output)
+@function_tool
+def canopy_discover_services(category: str | None = None, query: str | None = None):
+    """List paid services the agent can call."""
+    return canopy.discover(
+        **{k: v for k, v in {"category": category, "query": query}.items() if v},
+    )
+
+agent = Agent(
+    name="Treasurer",
+    instructions="Pay recipients and discover x402 services when asked.",
+    tools=[canopy_pay, canopy_discover_services],
+)
+print(Runner.run_sync(agent, "Find data feeds and use the cheapest.").final_output)
 ```
 
 ### OpenAI (Chat Completions)
+
+OpenAI's tool format wraps each entry in `{"type": "function", "function": { ... }}`. One-line transform:
 
 ```python
 import json, os
 from openai import OpenAI
 from canopy_ai import Canopy
 
-canopy = Canopy(
-    api_key=os.environ["CANOPY_API_KEY"],
-    agent_id=os.environ["CANOPY_AGENT_ID"],
-)
+canopy = Canopy(api_key=os.environ["CANOPY_API_KEY"], agent_id=os.environ["CANOPY_AGENT_ID"])
 openai = OpenAI()
-tools = canopy.get_tools(framework="openai")
-schema_tools = [{k: v for k, v in t.items() if k != "execute"} for t in tools]
+tools = canopy.get_tools()
+
+openai_tools = [
+    {
+        "type": "function",
+        "function": {"name": t["name"], "description": t["description"], "parameters": t["parameters"]},
+    }
+    for t in tools
+]
 
 completion = openai.chat.completions.create(
     model="gpt-4o",
-    messages=[{"role": "user", "content": "Send 5 cents to 0x1234..."}],
-    tools=schema_tools,
+    messages=[{"role": "user", "content": "Discover data feeds and pay for BTC orderbook."}],
+    tools=openai_tools,
 )
 
 for call in completion.choices[0].message.tool_calls or []:
-    tool = next(t for t in tools if t["function"]["name"] == call.function.name)
-    tool["execute"](json.loads(call.function.arguments))
+    t = next(x for x in tools if x["name"] == call.function.name)
+    t["execute"](json.loads(call.function.arguments))
+```
+
+### Anthropic
+
+Anthropic's Messages API renames `parameters` → `input_schema`. One-line transform:
+
+```python
+import os
+from anthropic import Anthropic
+from canopy_ai import Canopy
+
+canopy = Canopy(api_key=os.environ["CANOPY_API_KEY"], agent_id=os.environ["CANOPY_AGENT_ID"])
+client = Anthropic()
+tools = canopy.get_tools()
+
+anthropic_tools = [
+    {"name": t["name"], "description": t["description"], "input_schema": t["parameters"]}
+    for t in tools
+]
+
+msg = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=1024,
+    tools=anthropic_tools,
+    messages=[{"role": "user", "content": "Discover x402 data feeds and pay for one."}],
+)
+
+for block in msg.content:
+    if block.type == "tool_use":
+        t = next(x for x in tools if x["name"] == block.name)
+        t["execute"](dict(block.input))
 ```
 
 ### Pay paywalled APIs (x402)
@@ -187,7 +226,7 @@ res = canopy.fetch("https://paid-api.example.com/generate-image")
 # On HTTP 402, Canopy signs the payment and retries. You see the eventual 200.
 ```
 
-Subject to the same agent policy as `pay()`. Non-402 responses pass through. Async version: `await async_canopy.fetch(...)`.
+Subject to the same agent policy as `pay()`. Non-402 responses pass through. Async: `await async_canopy.fetch(...)`.
 
 ## Reference
 
@@ -197,7 +236,7 @@ Subject to the same agent policy as `pay()`. Non-402 responses pass through. Asy
 Canopy(
     *,
     api_key: str,                    # required
-    agent_id: str | None = None,     # required for pay/preview/fetch/ping/budget
+    agent_id: str | None = None,     # required for pay/preview/fetch/discover/ping/budget
     base_url: str | None = None,     # default: https://www.trycanopy.ai
     http_client: httpx.Client | None = None,
 )
@@ -232,11 +271,30 @@ Same signature and return shape as `pay()`, but evaluates the policy without sig
 
 ### `canopy.fetch(url, *, method="GET", headers=None, content=None)`
 
-Like `httpx.request`, but auto-pays HTTP 402 ([x402](https://x402.org)) responses. See above.
+Like `httpx.request`, but auto-pays HTTP 402 ([x402](https://x402.org)) responses. Same agent policy applies.
+
+### `canopy.discover(**kwargs)`
+
+Find x402-paywalled services the agent can call.
+
+```python
+services = canopy.discover(
+    category="data",          # or list of categories; optional
+    query="orderbook",        # optional free-text match
+    limit=20,                 # optional, default 20, capped at 50
+    include_blocked=False,    # include policy-blocked services with policy_allowed=False
+    include_unverified=False, # include long-tail unverified entries
+)
+# → list[DiscoveredService]
+#   { "slug", "name", "description", "url", "category",
+#     "payment_protocol", "typical_amount_usd", "pay_to", "policy_allowed" }
+```
+
+When the agent's policy has an allowlist, results are filtered to allowed payees by default. Pass `include_blocked=True` to see blocked services too — useful when you want the LLM to reason about why something isn't available.
 
 ### `canopy.ping()`
 
-Health check. Confirms the API key + agent are valid; returns a structured snapshot:
+Health check. Returns the agent + org snapshot:
 
 ```python
 ping = canopy.ping()
@@ -246,7 +304,7 @@ ping = canopy.ping()
 #   "latency_ms": int }
 ```
 
-Run on app startup to fail-fast on bad config. Also drives the dashboard's "Connected" indicator.
+Run on app startup to fail-fast on bad config.
 
 ### `canopy.budget()`
 
@@ -268,16 +326,20 @@ Polls until the approval leaves `pending` or the timeout elapses. Raises `Canopy
 
 One-shot read. Use to poll on your own cadence.
 
-### `canopy.get_tools(framework=...)`
+### `canopy.get_tools()`
 
-Returns LLM-framework-shaped tool specs. Supported frameworks:
+Returns the canonical tool list:
 
-| Framework | Returns |
-|---|---|
-| `"openai"` | List of `{ type: "function", function: {...}, execute }` |
-| `"anthropic"` | List of `{ name, description, input_schema, execute }` |
-| `"langchain"` | List of `{ name, description, schema, func }` (use with `StructuredTool.from_function`) |
-| `"vercel"` | Raises `NotImplementedError` — Vercel AI SDK is JavaScript-only |
+```python
+[
+    {"name": "canopy_pay", "description": "...",
+     "parameters": {...JSON Schema...}, "execute": <callable>},
+    {"name": "canopy_discover_services", "description": "...",
+     "parameters": {...JSON Schema...}, "execute": <callable>},
+]
+```
+
+Filter the list if you only want one (e.g., `[t for t in canopy.get_tools() if t["name"] == "canopy_pay"]`).
 
 ## Errors
 
@@ -320,9 +382,10 @@ Use an `ak_test_…` key so prod data stays clean.
 
 - **`401 Invalid API key`** — regenerate in Dashboard → Settings.
 - **`agent_id is required`** — pass `agent_id=` to the constructor or set `CANOPY_AGENT_ID`.
-- **`denied: Recipient ... is not in the allowlist`** — edit the agent's policy in the dashboard.
+- **`denied: Recipient ... is not in the allowlist`** — edit the agent's policy in the dashboard. `discover()` will respect the same allowlist.
 - **`denied: Spend cap exceeded`** — wait out the window or raise the cap. Call `canopy.budget()` to see remaining headroom.
 - **`pending_approval` and your script just sits there** — call `wait_for_approval(id)` to block, or `get_approval_status(id)` to poll on your own cadence.
+- **`discover()` returns an empty list** — the registry might not have x402 services in that category yet. Try without `category`, or pass `include_unverified=True` to see the long tail.
 
 ## Version
 

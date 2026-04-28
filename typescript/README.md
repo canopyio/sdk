@@ -10,15 +10,11 @@ Node 18+. Ships ESM + CJS. Zero runtime dependencies.
 
 ## Setup in 30 seconds
 
-The fast path, after you've signed up at <https://www.trycanopy.ai> and added an agent: click **Install** on the agent's page in the dashboard to get a one-time code, then in your project:
+After you've signed up at <https://www.trycanopy.ai> and added an agent:
 
-```bash
-npx @canopy-ai/sdk init <code>
-```
-
-That writes `CANOPY_API_KEY` and `CANOPY_AGENT_ID` into `.env.local` and pings to confirm the connection. The dashboard flips your agent's status to **Connected** in real time.
-
-Prefer manual setup? Dashboard → Settings → API Keys → Create (`ak_live_…`), then Dashboard → Agents → copy the `agt_…` id. Drop both into your env:
+1. Dashboard → **Settings** → copy your org API key (`ak_live_…`).
+2. Dashboard → **Agents** → copy the agent's `agt_…` id.
+3. Drop both into your project's `.env`:
 
 ```bash
 CANOPY_API_KEY=ak_live_xxxxxxxxxxxxxxxx
@@ -54,37 +50,36 @@ switch (result.status) {
 }
 ```
 
-## Plug Canopy into your agent
+## Discover paid services at runtime
 
-Drop a payment tool into whatever framework you're using. `getTools({ framework })` returns ready-to-bind definitions; the `execute` callable is wired to `canopy.pay()`.
-
-### Anthropic
+Don't hardcode URLs. Let the agent find x402 services it can call:
 
 ```ts
-import Anthropic from "@anthropic-ai/sdk";
-import { Canopy } from "@canopy-ai/sdk";
+const services = await canopy.discover({ category: "data", query: "orderbook" });
+// → [{ name, description, url, payTo, typicalAmountUsd, policyAllowed, ... }]
 
-const canopy = new Canopy({
-  apiKey: process.env.CANOPY_API_KEY!,
-  agentId: process.env.CANOPY_AGENT_ID!,
-});
-const client = new Anthropic();
-
-const tools = canopy.getTools({ framework: "anthropic" });
-const msg = await client.messages.create({
-  model: "claude-sonnet-4-6",
-  max_tokens: 1024,
-  tools: tools.map(({ execute, ...rest }) => rest),  // strip execute for the API
-  messages: [{ role: "user", content: "Pay 10 cents to agentic.market/anthropic" }],
-});
-
-// Dispatch any tool_use blocks back through Canopy:
-for (const block of msg.content) {
-  if (block.type !== "tool_use") continue;
-  const tool = tools.find((t) => t.name === block.name);
-  if (tool) await tool.execute(block.input as { to: string; amountUsd: number });
+const feed = services[0];
+if (feed?.policyAllowed) {
+  const data = await canopy.fetch(feed.url!);   // 402 → auto-paid → 200 with content
 }
 ```
+
+`discover()` queries Canopy's registry of x402 services. The agent's policy filters the results — if the policy has an allowlist, only services on that list are returned. Set `includeBlocked: true` to see blocked services too (with `policyAllowed: false`).
+
+## Plug Canopy into your agent
+
+`canopy.getTools()` returns the canonical tool list — `canopy_pay` and `canopy_discover_services` — as `{ name, description, parameters: JSONSchema, execute }`. Most frameworks consume this shape directly. For OpenAI / Anthropic, wrap with a one-line transform.
+
+| Framework | Fit | Recipe |
+|---|---|---|
+| Vercel AI SDK (v3+) | Direct | [↓](#vercel-ai-sdk) |
+| LangChain JS (v0.2+) | Direct | [↓](#langchain) |
+| Mastra | Direct | [↓](#mastra) |
+| OpenAI Chat Completions / Responses | One-line wrap | [↓](#openai-chat-completions) |
+| Anthropic Messages | One-line wrap | [↓](#anthropic) |
+| MCP host (Claude Desktop, Cursor, Cline, Windsurf) | No code — install [`@canopy-ai/mcp`](../mcp) | — |
+
+If your framework isn't listed but accepts a tool definition with JSON Schema + an async callable, our canonical shape works directly. If it expects a different envelope (like OpenAI/Anthropic), wrap with a `.map(...)`.
 
 ### Vercel AI SDK
 
@@ -97,11 +92,12 @@ const canopy = new Canopy({
   apiKey: process.env.CANOPY_API_KEY!,
   agentId: process.env.CANOPY_AGENT_ID!,
 });
+const tools = canopy.getTools();
 
 const { text } = await generateText({
   model: openai("gpt-4o"),
-  tools: canopy.getTools({ framework: "vercel" }),  // Record<string, Tool>
-  prompt: "Send 5 cents to 0x1234...",
+  tools: Object.fromEntries(tools.map((t) => [t.name, t])),
+  prompt: "Find me an orderbook feed and pull BTC depth.",
 });
 ```
 
@@ -116,11 +112,20 @@ const canopy = new Canopy({
   agentId: process.env.CANOPY_AGENT_ID!,
 });
 
-const [spec] = canopy.getTools({ framework: "langchain" });
-const payTool = new DynamicStructuredTool(spec);  // pass the spec directly — JSON Schema, no Zod required
+const lcTools = canopy.getTools().map(
+  (t) =>
+    new DynamicStructuredTool({
+      name: t.name,
+      description: t.description,
+      schema: t.parameters,
+      func: t.execute,
+    }),
+);
 ```
 
-### OpenAI
+### OpenAI (Chat Completions)
+
+OpenAI's tool format wraps each entry in `{ type: "function", function: { ... } }`. One-line transform:
 
 ```ts
 import OpenAI from "openai";
@@ -131,23 +136,70 @@ const canopy = new Canopy({
   agentId: process.env.CANOPY_AGENT_ID!,
 });
 const openai = new OpenAI();
-const tools = canopy.getTools({ framework: "openai" });
+const tools = canopy.getTools();
 
 const completion = await openai.chat.completions.create({
   model: "gpt-4o",
-  messages: [{ role: "user", content: "Send 5 cents to 0x1234..." }],
-  tools: tools.map(({ execute, ...rest }) => rest),
+  messages: [{ role: "user", content: "Find data feeds I can pay for and use the cheapest." }],
+  tools: tools.map(({ execute, ...rest }) => ({ type: "function", function: rest })),
 });
 
 for (const call of completion.choices[0].message.tool_calls ?? []) {
-  const tool = tools.find((t) => t.function.name === call.function.name);
-  if (tool) await tool.execute(JSON.parse(call.function.arguments));
+  const t = tools.find((x) => x.name === call.function.name);
+  if (t) await t.execute(JSON.parse(call.function.arguments));
 }
+```
+
+### Anthropic
+
+Anthropic's Messages API renames `parameters` → `input_schema`. One-line transform:
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+import { Canopy } from "@canopy-ai/sdk";
+
+const canopy = new Canopy({
+  apiKey: process.env.CANOPY_API_KEY!,
+  agentId: process.env.CANOPY_AGENT_ID!,
+});
+const client = new Anthropic();
+const tools = canopy.getTools();
+
+const msg = await client.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 1024,
+  tools: tools.map(({ execute, parameters, ...rest }) => ({ ...rest, input_schema: parameters })),
+  messages: [{ role: "user", content: "Discover x402 data feeds and pay for one." }],
+});
+
+for (const block of msg.content) {
+  if (block.type !== "tool_use") continue;
+  const t = tools.find((x) => x.name === block.name);
+  if (t) await t.execute(block.input as Record<string, unknown>);
+}
+```
+
+### Mastra
+
+```ts
+import { createTool } from "@mastra/core/tools";
+
+const mastraTools = Object.fromEntries(
+  canopy.getTools().map((t) => [
+    t.name,
+    createTool({
+      id: t.name,
+      description: t.description,
+      inputSchema: t.parameters,
+      execute: ({ context }) => t.execute(context),
+    }),
+  ]),
+);
 ```
 
 ### Pay paywalled APIs (x402)
 
-Drop-in replacement for `fetch` that auto-pays [x402](https://x402.org) endpoints:
+`canopy.fetch()` is a drop-in replacement for global `fetch` that auto-pays [x402](https://x402.org) endpoints:
 
 ```ts
 const res = await canopy.fetch("https://paid-api.example.com/generate-image");
@@ -163,7 +215,7 @@ Subject to the same agent policy as `pay()`. Non-402 responses pass through unto
 ```ts
 new Canopy({
   apiKey: string;          // required
-  agentId?: string;        // required for pay/preview/fetch/ping/budget
+  agentId?: string;        // required for pay/preview/fetch/discover/ping/budget
   baseUrl?: string;        // default: https://www.trycanopy.ai
 })
 ```
@@ -191,7 +243,25 @@ Same shape and return as `pay()`, but evaluates the policy without signing or pe
 
 ### `canopy.fetch(url, init?)`
 
-Like global `fetch`, but auto-pays HTTP 402 responses per the x402 spec. See above.
+Like global `fetch`, but auto-pays HTTP 402 responses per the x402 spec. Same agent policy applies.
+
+### `canopy.discover(opts?)`
+
+Find x402-paywalled services the agent can call.
+
+```ts
+const services = await canopy.discover({
+  category: "data",         // optional, e.g. "data", "api", "compute"
+  query: "orderbook",       // optional free-text match
+  limit: 20,                // optional, default 20, capped at 50
+  includeBlocked: false,    // include policy-blocked services with policyAllowed=false
+  includeUnverified: false, // include long-tail unverified entries
+});
+// → DiscoveredService[]: { slug, name, description, url, category,
+//                          paymentProtocol, typicalAmountUsd, payTo, policyAllowed }
+```
+
+When the agent's policy has an allowlist, results are filtered to allowed payees by default. Pass `includeBlocked: true` to see blocked services too (each marked `policyAllowed: false`) — useful when you want the LLM to reason about why something isn't available.
 
 ### `canopy.ping()`
 
@@ -205,7 +275,7 @@ const ping = await canopy.ping();
 //   latencyMs }
 ```
 
-Run on app startup to fail-fast on bad config. Also drives the dashboard's "Connected" indicator.
+Run on app startup to fail-fast on bad config.
 
 ### `canopy.budget()`
 
@@ -236,9 +306,24 @@ Throws `CanopyApprovalTimeoutError` on timeout.
 
 One-shot read of the same status. Use this when you want to poll on your own cadence.
 
-### `canopy.getTools({ framework })`
+### `canopy.getTools()`
 
-Returns LLM-framework-shaped tool definitions for the four supported frameworks: `"openai"`, `"anthropic"`, `"vercel"`, `"langchain"`. Each entry carries an `execute` callable that calls `canopy.pay()`. See examples above.
+Returns the canonical tool list as `CanopyTool[]`:
+
+```ts
+type CanopyTool = {
+  name: string;            // "canopy_pay", "canopy_discover_services"
+  description: string;
+  parameters: Record<string, unknown>;  // JSON Schema
+  execute: (args: any) => Promise<unknown>;
+};
+```
+
+Two tools by default: `canopy_pay` and `canopy_discover_services`. Filter the array if you only want one:
+
+```ts
+const payOnly = canopy.getTools().filter((t) => t.name === "canopy_pay");
+```
 
 ## Errors
 
@@ -287,9 +372,10 @@ Use a test-mode key (`ak_test_…`) so prod data stays clean.
 
 - **`401 Invalid API key`** — regenerate in Dashboard → Settings.
 - **`agentId is required for pay()`** — pass `agentId` to the constructor or set `CANOPY_AGENT_ID`.
-- **`denied: Recipient is not in the allowlist`** — edit the agent's policy to add the recipient, or pick a different one.
+- **`denied: Recipient is not in the allowlist`** — edit the agent's policy to add the recipient, or pick a different one. `discover()` will respect the same allowlist.
 - **`denied: Spend cap exceeded`** — wait out the cap window or raise it in the dashboard. Run `canopy.budget()` to see remaining headroom.
 - **`pending_approval` and your script just sits there** — call `waitForApproval(id)` to block, or `getApprovalStatus(id)` to poll on your own cadence.
+- **`discover()` returns an empty array** — the registry might not have x402 services in that category yet. Try without `category`, or pass `includeUnverified: true` to see the long tail.
 
 ## Version
 
