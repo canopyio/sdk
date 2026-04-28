@@ -126,6 +126,43 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: "canopy_approve",
+      description:
+        "Mark a pending payment approval as approved. Call this ONLY when the user explicitly " +
+        "approves a transaction in chat (e.g., they replied 'yes', 'approve', 'go ahead'). The " +
+        "approval_id comes from a previous canopy_pay result whose status was 'pending_approval'. " +
+        "Never call this on your own — only when the user gives explicit consent. Returns 403 " +
+        "with chat_approval_disabled if the agent's policy disallows chat approval; in that " +
+        "case, direct the user to the dashboard.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          approval_id: {
+            type: "string",
+            description: "The approval id returned by canopy_pay when status was 'pending_approval'.",
+          },
+        },
+        required: ["approval_id"],
+      },
+    },
+    {
+      name: "canopy_deny",
+      description:
+        "Mark a pending payment approval as denied. Call this ONLY when the user explicitly " +
+        "denies a transaction in chat (e.g., they replied 'no', 'deny', 'cancel'). The " +
+        "approval_id comes from a previous canopy_pay result whose status was 'pending_approval'.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          approval_id: {
+            type: "string",
+            description: "The approval id returned by canopy_pay when status was 'pending_approval'.",
+          },
+        },
+        required: ["approval_id"],
+      },
+    },
+    {
       name: "canopy_discover_services",
       description:
         "List paid services the agent can call (x402 by default). Filter by category " +
@@ -190,6 +227,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (name === "canopy_discover_services") {
     const typed = (args ?? {}) as { category?: string; query?: string; limit?: number };
     const result = await canopy.discover(typed);
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+  if (name === "canopy_approve") {
+    const { approval_id } = args as { approval_id: string };
+    const result = await canopy.approve(approval_id);
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+  if (name === "canopy_deny") {
+    const { approval_id } = args as { approval_id: string };
+    const result = await canopy.deny(approval_id);
     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
   }
   throw new Error(`Unknown tool: ${name}`);

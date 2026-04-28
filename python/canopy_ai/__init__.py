@@ -2,7 +2,11 @@ from canopy_ai.async_client import AsyncCanopy
 from canopy_ai.client import Canopy
 from canopy_ai.errors import (
     CanopyApiError,
+    CanopyApprovalDeniedError,
+    CanopyApprovalExpiredError,
+    CanopyApprovalRequiredError,
     CanopyApprovalTimeoutError,
+    CanopyChatApprovalDisabledError,
     CanopyConfigError,
     CanopyError,
     CanopyNetworkError,
@@ -28,6 +32,10 @@ __all__ = [
     "CanopyNetworkError",
     "CanopyConfigError",
     "CanopyApprovalTimeoutError",
+    "CanopyApprovalRequiredError",
+    "CanopyApprovalDeniedError",
+    "CanopyApprovalExpiredError",
+    "CanopyChatApprovalDisabledError",
     "PayResult",
     "PayResultAllowed",
     "PayResultDenied",

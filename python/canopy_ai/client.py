@@ -1,5 +1,10 @@
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from canopy_ai.adapters.anthropic import AnthropicAdapter
+    from canopy_ai.adapters.openai import OpenAIAdapter
+    from canopy_ai.adapters.vercel import VercelAdapter
 
 import httpx
 
@@ -223,6 +228,33 @@ class Canopy:
             http_client=self._transport.client,
             wait_for_approval=wait_for_approval,
         )
+
+    @property
+    def openai(self) -> "OpenAIAdapter":
+        """OpenAI Chat Completions / Responses adapter (`tools()` + `dispatch()`)."""
+        from canopy_ai.adapters.openai import OpenAIAdapter
+
+        if not hasattr(self, "_openai_adapter"):
+            self._openai_adapter = OpenAIAdapter(self)
+        return self._openai_adapter
+
+    @property
+    def anthropic(self) -> "AnthropicAdapter":
+        """Anthropic Messages adapter (`tools()` + `dispatch()`)."""
+        from canopy_ai.adapters.anthropic import AnthropicAdapter
+
+        if not hasattr(self, "_anthropic_adapter"):
+            self._anthropic_adapter = AnthropicAdapter(self)
+        return self._anthropic_adapter
+
+    @property
+    def vercel(self) -> "VercelAdapter":
+        """Vercel AI SDK shape — `Record<name, {description, parameters, execute}>`."""
+        from canopy_ai.adapters.vercel import VercelAdapter
+
+        if not hasattr(self, "_vercel_adapter"):
+            self._vercel_adapter = VercelAdapter(self)
+        return self._vercel_adapter
 
     def get_tools(self) -> list[CanopyTool]:
         """

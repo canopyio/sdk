@@ -26,6 +26,9 @@ import {
 import { canopyFetch } from "./fetch.js";
 import { discover as discoverImpl } from "./discover.js";
 import { getTools as getToolsImpl } from "./tools/index.js";
+import { OpenAIAdapter } from "./adapters/openai.js";
+import { AnthropicAdapter } from "./adapters/anthropic.js";
+import { VercelAdapter } from "./adapters/vercel.js";
 
 const DEFAULT_BASE_URL = "https://www.trycanopy.ai";
 const DEFAULT_CHAIN_ID = 8453;
@@ -57,6 +60,13 @@ export class Canopy {
   private readonly baseUrl: string;
   readonly agentId?: string;
 
+  /** OpenAI Chat Completions / Responses adapter. `tools()` + `dispatch()`. */
+  readonly openai: OpenAIAdapter;
+  /** Anthropic Messages adapter. `tools()` + `dispatch()`. */
+  readonly anthropic: AnthropicAdapter;
+  /** Vercel AI SDK adapter. `tools()` (Vercel runs its own dispatch loop). */
+  readonly vercel: VercelAdapter;
+
   constructor(config: CanopyConfig) {
     const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
     if (!config.apiKey) {
@@ -67,6 +77,9 @@ export class Canopy {
     this.agentId = config.agentId;
     this.baseUrl = baseUrl;
     this.transport = new Transport(this.baseUrl, this.apiKey);
+    this.openai = new OpenAIAdapter(this);
+    this.anthropic = new AnthropicAdapter(this);
+    this.vercel = new VercelAdapter(this);
   }
 
   /** Issue a payment, gated by the org's policy for this agent. */

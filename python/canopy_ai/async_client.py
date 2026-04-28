@@ -14,8 +14,13 @@ import asyncio
 import base64
 import json
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
+
+if TYPE_CHECKING:
+    from canopy_ai.adapters.anthropic import AsyncAnthropicAdapter
+    from canopy_ai.adapters.openai import AsyncOpenAIAdapter
+    from canopy_ai.adapters.vercel import AsyncVercelAdapter
 
 import httpx
 
@@ -38,6 +43,7 @@ from canopy_ai.discover import map_response as _map_discover_response
 from canopy_ai.types import (
     ApprovalStatus,
     BudgetSnapshot,
+    CanopyTool,
     DecideApprovalResult,
     DiscoverArgs,
     DiscoveredService,
@@ -250,6 +256,48 @@ class AsyncCanopy:
         path = f"/api/services?{qs}" if qs else "/api/services"
         _, body = await self._request("GET", path, expect_statuses=[200])
         return _map_discover_response(body)
+
+    # ----------------------------------------------------------------- tools
+
+    @property
+    def openai(self) -> "AsyncOpenAIAdapter":
+        """Async OpenAI adapter (`tools()` + `await dispatch(...)`)."""
+        from canopy_ai.adapters.openai import AsyncOpenAIAdapter
+
+        if not hasattr(self, "_openai_adapter"):
+            self._openai_adapter = AsyncOpenAIAdapter(self)
+        return self._openai_adapter
+
+    @property
+    def anthropic(self) -> "AsyncAnthropicAdapter":
+        """Async Anthropic adapter (`tools()` + `await dispatch(...)`)."""
+        from canopy_ai.adapters.anthropic import AsyncAnthropicAdapter
+
+        if not hasattr(self, "_anthropic_adapter"):
+            self._anthropic_adapter = AsyncAnthropicAdapter(self)
+        return self._anthropic_adapter
+
+    @property
+    def vercel(self) -> "AsyncVercelAdapter":
+        """Vercel AI SDK shape (async-bound execute callables)."""
+        from canopy_ai.adapters.vercel import AsyncVercelAdapter
+
+        if not hasattr(self, "_vercel_adapter"):
+            self._vercel_adapter = AsyncVercelAdapter(self)
+        return self._vercel_adapter
+
+    def get_tools(self) -> list[CanopyTool]:
+        """
+        Returns the SDK's canonical tool list with async-bound ``execute``
+        callables — same ``{name, description, parameters: JSONSchema, execute}``
+        shape as :meth:`canopy_ai.Canopy.get_tools`, but each ``execute`` is a
+        coroutine you ``await``. Hands directly to LangChain
+        ``StructuredTool.from_function`` (use ``coroutine=`` instead of ``func=``)
+        and any framework that accepts async tool callables.
+        """
+        from canopy_ai.integrations import get_async_tools
+
+        return get_async_tools(self)
 
     # ------------------------------------------------------------------ ping
 

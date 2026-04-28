@@ -36,7 +36,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
 }
 ```
 
-Restart Claude Desktop. In any new conversation, the hammer icon (tools) should list `canopy_pay` and `canopy_preview`.
+Restart Claude Desktop. In any new conversation, the hammer icon (tools) should list the Canopy tools — `canopy_pay`, `canopy_preview`, `canopy_discover_services`, `canopy_approve`, `canopy_deny`, plus the helpers below.
 
 ### Cursor
 
@@ -65,7 +65,7 @@ Any MCP host with a `mcpServers` config block will work with the same shape — 
 
 ## Available tools
 
-Seven tools covering discovery + the full payment lifecycle:
+Nine tools covering discovery, the payment lifecycle, and chat-native approvals:
 
 ### `canopy_pay`
 
@@ -132,6 +132,31 @@ Block until an approval is decided, or up to 60 seconds. Useful when the user is
 
 `timeoutMs` is optional and capped at `60000` regardless of caller input — long timeouts would hold the MCP transport. Returns the same shape as `canopy_get_approval_status`.
 
+### `canopy_approve`
+
+Mark a pending approval as approved. The LLM calls this when the user explicitly approves a transaction in chat (e.g. they replied "yes", "approve", "go ahead"). Lets the user say yes naturally without leaving the chat to open the dashboard.
+
+**Arguments**
+```json
+{ "approval_id": "ar_..." }
+```
+
+**Returns**
+```json
+{
+  "decision": "approved",
+  "transactionId": "...",
+  "txHash": "0x...",
+  "signature": "0x..."
+}
+```
+
+Gated by the agent's policy: if "Allow approval from chat" is off, returns a 403 with `chat_approval_disabled` and the LLM should redirect the user to the dashboard.
+
+### `canopy_deny`
+
+Mark a pending approval as denied. The LLM calls this when the user explicitly declines (e.g. they replied "no", "deny", "cancel"). Same arg / response shape as `canopy_approve` but with `decision: "denied"` and `txHash` / `signature` left null.
+
 ### `canopy_ping`
 
 Verify the configured API key + agent are valid. Returns the agent and org details plus round-trip latency. Useful as a first-turn self-check ("am I configured correctly?").
@@ -180,31 +205,28 @@ List paid services the agent can call. Filter by category (`data`, `api`, `compu
 
 All optional. With no args, returns the top services the agent's policy permits.
 
-**Returns**
+**Returns** — a JSON array of services (one per match):
 ```json
-{
-  "services": [
-    {
-      "slug": "agentic.market/coinglass-orderbook",
-      "name": "Coinglass Orderbook Feed",
-      "description": "Real-time order book depth.",
-      "url": "https://api.coinglass.example/v1/orderbook",
-      "category": "data",
-      "paymentProtocol": "x402",
-      "typicalAmountUsd": 0.01,
-      "payTo": "0x...",
-      "policyAllowed": true
-    }
-  ],
-  "count": 1
-}
+[
+  {
+    "slug": "agentic.market/coinglass-orderbook",
+    "name": "Coinglass Orderbook Feed",
+    "description": "Real-time order book depth.",
+    "url": "https://api.coinglass.example/v1/orderbook",
+    "category": "data",
+    "paymentProtocol": "x402",
+    "typicalAmountUsd": 0.01,
+    "payTo": "0x...",
+    "policyAllowed": true
+  }
+]
 ```
 
 If the agent's policy has an allowlist, results are filtered to allowed payees by default.
 
 ## How the LLM experiences it
 
-Once the server is loaded, the host exposes all seven tools in its normal tool UI. The LLM decides when to call them; the host runs them; results come back as tool output the LLM reads. A typical prompt flow:
+Once the server is loaded, the host exposes all nine tools in its normal tool UI. The LLM decides when to call them; the host runs them; results come back as tool output the LLM reads. A typical prompt flow:
 
 > **You:** find a data feed and pay for BTC orderbook depth.
 > **LLM:** *[calls `canopy_discover_services({ category: "data", query: "orderbook" })`]*
@@ -213,7 +235,15 @@ Once the server is loaded, the host exposes all seven tools in its normal tool U
 > *[tool returns `{ "status": "allowed", "txHash": "0xabc…" }`]*
 > **LLM:** Paid Coinglass $0.01 for the feed. Here's the depth: …
 
-If the amount exceeds the approval threshold, the LLM sees `pending_approval` and will usually tell the user to approve in the dashboard. Approvals happen in the Canopy web dashboard, not inside the MCP host.
+If the amount exceeds the approval threshold, the LLM sees `pending_approval` with rich context (`recipientName`, `amountUsd`, `agentName`, `expiresAt`) and asks the user inline:
+
+> **LLM:** I'd like to pay $5 to Alchemy for compute. Reply 'approve' or 'deny'.
+> **You:** approve
+> **LLM:** *[calls `canopy_approve({ approval_id: "ar_x9" })`]*
+> *[tool returns `{ "decision": "approved", "txHash": "0x123…" }`]*
+> **LLM:** Approved — sent. tx 0x123… on Base.
+
+To force the dashboard route instead, turn off "Allow approval from chat" on the policy. Then `canopy_approve` returns 403 with `chat_approval_disabled` and the LLM should direct the user to the Canopy dashboard.
 
 ## Custom base URL (local dev)
 
@@ -249,11 +279,13 @@ Use a test-mode key (`ak_test_…`) so you don't pollute production data.
 
 **`canopy_pay` returns `denied` with "Spend cap exceeded"** — the agent has spent its cap in the current window. Wait it out or raise the cap in the dashboard.
 
-**`canopy_pay` returns `pending_approval`** — call `canopy_wait_for_approval({ approvalId })` to block up to 60 seconds for a decision, or `canopy_get_approval_status({ approvalId })` to poll on your own cadence. If the user takes longer than a minute, ask them to decide in the dashboard, then re-call `canopy_pay` with the same arguments — idempotency returns the cached `allowed` result without re-charging.
+**`canopy_pay` returns `pending_approval`** — three options. (1) Tell the user inline using `recipientName` / `amountUsd` from the result, then call `canopy_approve({ approval_id })` or `canopy_deny({ approval_id })` when they reply (requires "Allow approval from chat" on the policy). (2) Call `canopy_wait_for_approval({ approvalId })` to block up to 60 seconds while the user decides in the dashboard. (3) `canopy_get_approval_status({ approvalId })` to poll on your own cadence.
+
+**`canopy_approve` returns 403 with `chat_approval_disabled`** — the agent's policy has chat-based approval turned off. Direct the user to the dashboard.
 
 ## What's under the hood
 
-`@canopy-ai/mcp` is a thin wrapper around [`@canopy-ai/sdk`](../typescript). It's an stdio MCP server (the official `@modelcontextprotocol/sdk`) that exposes `canopy.pay`, `canopy.preview`, `canopy.getApprovalStatus`, `canopy.waitForApproval`, `canopy.ping`, `canopy.budget`, and `canopy.discover` as MCP tools. No custody — the server just proxies to Canopy's API with your key.
+`@canopy-ai/mcp` is a thin wrapper around [`@canopy-ai/sdk`](../typescript). It's an stdio MCP server (the official `@modelcontextprotocol/sdk`) that exposes `canopy.pay`, `canopy.preview`, `canopy.discover`, `canopy.approve`, `canopy.deny`, `canopy.getApprovalStatus`, `canopy.waitForApproval`, `canopy.ping`, and `canopy.budget` as MCP tools. No custody — the server just proxies to Canopy's API with your key.
 
 ## Version
 

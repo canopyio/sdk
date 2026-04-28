@@ -24,6 +24,19 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./langchain": {
+      "types": "./dist/langchain.d.ts",
+      "import": "./dist/langchain.js",
+      "require": "./dist/langchain.cjs"
+    }
+  },
+  "peerDependencies": {
+    "@langchain/core": "^0.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@langchain/core": {
+      "optional": true
     }
   },
   "files": [
@@ -51,6 +64,7 @@
     "llm"
   ],
   "devDependencies": {
+    "@langchain/core": "^0.3.80",
     "@types/node": "^22.10.0",
     "tsup": "^8.3.5",
     "typescript": "^5.7.0",

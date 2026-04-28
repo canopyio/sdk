@@ -39,12 +39,16 @@ def _new_canopy(captured: dict[str, Any]) -> Canopy:
 
 
 class TestCanonicalTools:
-    def test_returns_canonical_pay_and_discover(self) -> None:
+    def test_returns_canonical_tool_list(self) -> None:
         canopy = Canopy(api_key="ak_test_x", agent_id="agt_test")
         tools = canopy.get_tools()
-        assert len(tools) == 2
         names = [t["name"] for t in tools]
-        assert names == ["canopy_pay", "canopy_discover_services"]
+        assert names == [
+            "canopy_pay",
+            "canopy_discover_services",
+            "canopy_approve",
+            "canopy_deny",
+        ]
         for t in tools:
             assert isinstance(t["name"], str)
             assert isinstance(t["description"], str)
@@ -53,13 +57,13 @@ class TestCanonicalTools:
 
     def test_pay_required_args(self) -> None:
         canopy = Canopy(api_key="ak_test_x", agent_id="agt_test")
-        [pay, _] = canopy.get_tools()
+        pay = next(t for t in canopy.get_tools() if t["name"] == "canopy_pay")
         assert pay["parameters"]["required"] == ["to", "amountUsd"]
 
     def test_pay_execute_hits_api_sign(self) -> None:
         captured: dict[str, Any] = {}
         canopy = _new_canopy(captured)
-        [pay, _] = canopy.get_tools()
+        pay = next(t for t in canopy.get_tools() if t["name"] == "canopy_pay")
         pay["execute"]({"to": "0x" + "1" * 40, "amountUsd": 0.1})
         assert captured["path"] == "/api/sign"
         assert captured["body"]["agent_id"] == "agt_test"

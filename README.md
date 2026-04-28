@@ -30,7 +30,12 @@ const result = await canopy.pay({
 if (result.status === "allowed") {
   console.log("paid:", result.txHash);
 } else if (result.status === "pending_approval") {
-  await canopy.waitForApproval(result.approvalId);
+  // Three options (see the per-language READMEs):
+  //   1. ask the user in chat (using result.recipientName / result.amountUsd)
+  //      and call canopy.approve(result.approvalId) / .deny(...) when they reply
+  //   2. canopy.waitForApproval(result.approvalId) — block-poll the dashboard
+  //   3. let it ride — the dashboard handles it
+  console.log(`pending: $${result.amountUsd} to ${result.recipientName}`);
 } else {
   console.log("denied:", result.reason);
 }
@@ -55,14 +60,18 @@ Every SDK exposes the same surface:
 |---|---|
 | `pay({ to, amountUsd })` | Issue a payment. |
 | `preview({ to, amountUsd })` | Dry-run the policy. Nothing signed or persisted. |
-| `fetch(url)` | Like `fetch`, but auto-pays HTTP 402 ([x402](https://x402.org)) responses. |
+| `fetch(url, init?, opts?)` | Like `fetch`, but auto-pays HTTP 402 ([x402](https://x402.org)) responses. Pass `{ waitForApproval: true }` to block on pending approvals. |
 | `discover({ category, query })` | Find x402 services the agent can call. Filtered by the agent's policy by default. |
+| `approve(id)` / `deny(id)` | Mark a pending approval decided. Call when the user says "yes" / "no" in chat. Gated by the policy's `chat_approval_enabled` flag. |
+| `waitForApproval(id)` | Block until a pending approval is decided (poll-based). |
 | `ping()` | Health check + the moment the dashboard shows your agent as connected. |
 | `budget()` | "How much can I spend right now?" — pre-flight cap snapshot. |
-| `waitForApproval(id)` | Block until a pending approval is decided. |
-| `getTools()` | Canonical tool list (`canopy_pay`, `canopy_discover_services`) for any agent framework. |
+| `getTools()` | Canonical tool list (`canopy_pay`, `canopy_discover_services`, `canopy_approve`, `canopy_deny`) for any agent framework. |
+| `canopy.openai.tools()` / `.dispatch()` | Tools + dispatch loop pre-shaped for OpenAI Chat Completions / Responses. |
+| `canopy.anthropic.tools()` / `.dispatch()` | Same, for Anthropic Messages. |
+| `canopy.vercel.tools()` | Vercel AI SDK shape — passes through directly to `generateText`. |
 
-The package READMEs ([typescript](./typescript), [python](./python)) have copy-paste recipes for each framework.
+For LangChain (`@canopy-ai/sdk/langchain` / `canopy_ai.langchain`) and OpenAI Agents SDK (`canopy_ai.openai_agents`) we ship subpath imports with optional peer deps so you only pay for what you use. The package READMEs ([typescript](./typescript), [python](./python)) have copy-paste recipes for each framework.
 
 ## Repo layout
 
