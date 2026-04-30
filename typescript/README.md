@@ -115,12 +115,12 @@ const res = await canopy.fetch("https://paid-api.example.com/generate", undefine
 
 ## Plug Canopy into your agent
 
-**Already running an MCP-aware agent?** Skip this section — install [`@canopy-ai/mcp`](../mcp) once and your agent gets all four canonical Canopy tools through MCP. That's the right path for Claude Agent SDK, Claude Desktop, Cursor, Cline, Windsurf, and any future MCP host. The native adapters below are for direct LLM-API flows where MCP isn't a fit (backend scripts, x402 auto-paying via `canopy.fetch()`, raw `chat.completions.create` / `messages.create` loops, edge runtimes).
+**Already running an MCP-aware agent?** Skip this section — paste `https://mcp.trycanopy.ai/mcp` into the host's Custom Connectors or `mcpServers` config and your agent gets all nine canonical Canopy tools through MCP. That's the right path for claude.ai, ChatGPT, Claude Agent SDK, Claude Desktop, Cursor, VS Code, Zed, Cline, Windsurf, and any other MCP host. The native adapters below are for direct LLM-API flows where MCP isn't a fit (backend scripts, x402 auto-paying via `canopy.fetch()`, raw `chat.completions.create` / `messages.create` loops, edge runtimes).
 
 | Framework | Helper | Lines of glue |
 |---|---|---|
-| MCP host (Claude Desktop, Cursor, Cline, Windsurf) | install [`@canopy-ai/mcp`](../mcp) | 0 |
-| Claude Agent SDK | Canopy MCP + `allowedTools: ["mcp__canopy__*"]` | 0 Canopy code |
+| MCP host (claude.ai, ChatGPT, Claude Desktop, Cursor, VS Code, Zed, Cline, Windsurf) | paste `https://mcp.trycanopy.ai/mcp` | 0 |
+| Claude Agent SDK | Remote MCP + `allowedTools: ["mcp__canopy__*"]` | 0 Canopy code |
 | Vercel AI SDK (v3+) | `canopy.vercel.tools()` | 1 |
 | OpenAI Chat Completions / Responses | `canopy.openai.tools()` + `canopy.openai.dispatch()` | 2 |
 | Anthropic Messages | `canopy.anthropic.tools()` + `canopy.anthropic.dispatch()` | 2 |
@@ -128,7 +128,7 @@ const res = await canopy.fetch("https://paid-api.example.com/generate", undefine
 
 `canopy.getTools()` is still available as the canonical, framework-agnostic shape (`{ name, description, parameters: JSONSchema, execute }[]`) for any framework not listed.
 
-Claude Agent SDK uses MCP for external tools — prefer [`@canopy-ai/mcp`](../mcp) over the Anthropic Messages adapter there. `canopy.anthropic` is for direct `@anthropic-ai/sdk` Messages API loops.
+Claude Agent SDK uses MCP for external tools — prefer the remote MCP URL over the Anthropic Messages adapter there. `canopy.anthropic` is for direct `@anthropic-ai/sdk` Messages API loops.
 
 ### Vercel AI SDK
 

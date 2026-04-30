@@ -2,15 +2,15 @@
 
 [Canopy](https://trycanopy.ai) is a treasury wallet for AI agents. You fund a USDC wallet on Base; your agent spends from it, gated by per-agent policies you set in the dashboard (cap, allowlist, approval threshold). No private keys leave the server.
 
-## Pick a package
+## Pick a path
 
-| Package | Install | Use when |
+| Path | How | Use when |
 |---|---|---|
-| **[`@canopy-ai/mcp`](./mcp)** | `npx -y @canopy-ai/mcp` | **Default for any MCP-aware agent** — Claude Agent SDK, Claude Desktop, Cursor, Cline, Windsurf. One install, all four canonical Canopy tools, zero code changes. |
+| **Remote MCP** (recommended for any MCP host) | Paste `https://mcp.trycanopy.ai/mcp` into the host's Custom Connectors / `mcpServers` config | claude.ai, ChatGPT, Claude Desktop, Cursor, VS Code, Zed, Cline, Windsurf, Claude Agent SDK. One URL, all nine canonical Canopy tools, zero code changes. See [Connect MCP hosts](https://trycanopy.ai/documentation/connect/mcp). |
 | **[`@canopy-ai/sdk`](./typescript)** | `npm install @canopy-ai/sdk` | TypeScript / Node.js agents that call `canopy.pay()` directly, auto-pay x402 endpoints via `canopy.fetch()`, or wire raw OpenAI / Anthropic / Vercel / LangChain flows where MCP isn't a fit. |
 | **[`canopy-ai`](./python)** | `pip install canopy-ai` | Python agents in the same situations — pure-API use, x402 paywalled APIs, raw `chat.completions.create` / `messages.create`, LangChain / LangGraph / OpenAI Agents SDK. |
 
-All three share the same wire format and return shapes. Start with `@canopy-ai/mcp` if your runtime supports MCP — it covers the broadest set of agent hosts with the smallest install footprint. Fall back to the language SDKs for cases MCP doesn't reach.
+All three share the same wire format and return shapes. Start with the remote MCP URL if your runtime supports MCP — it covers the broadest set of agent hosts with zero install footprint. Fall back to the language SDKs for cases MCP doesn't reach.
 
 ## 30-second example
 
@@ -71,7 +71,7 @@ Every SDK exposes the same surface:
 | `canopy.anthropic.tools()` / `.dispatch()` | Same, for Anthropic Messages. |
 | `canopy.vercel.tools()` | Vercel AI SDK shape — passes through directly to `generateText`. |
 
-For LangChain (`@canopy-ai/sdk/langchain` / `canopy_ai.langchain`) and OpenAI Agents SDK (`canopy_ai.openai_agents`) we ship subpath imports with optional peer deps so you only pay for what you use. For Claude Agent SDK, use the Canopy MCP server with `allowedTools: ["mcp__canopy__*"]`. The package READMEs ([typescript](./typescript), [python](./python), [mcp](./mcp)) have copy-paste recipes for each framework.
+For LangChain (`@canopy-ai/sdk/langchain` / `canopy_ai.langchain`) and OpenAI Agents SDK (`canopy_ai.openai_agents`) we ship subpath imports with optional peer deps so you only pay for what you use. For Claude Agent SDK, point at the [remote MCP URL](https://trycanopy.ai/documentation/connect/claude-agent-sdk) with `allowedTools: ["mcp__canopy__*"]`. The package READMEs ([typescript](./typescript), [python](./python)) have copy-paste recipes for each framework.
 
 ## Repo layout
 
@@ -79,11 +79,12 @@ For LangChain (`@canopy-ai/sdk/langchain` / `canopy_ai.langchain`) and OpenAI Ag
 sdk/
 ├── typescript/         @canopy-ai/sdk
 ├── python/             canopy-ai
-├── mcp/                @canopy-ai/mcp (stdio MCP server)
 └── shared/
     ├── openapi.yaml    HTTP contract
     └── fixtures/       JSON fixtures replayed by both SDKs in CI
 ```
+
+The remote MCP server itself lives in the canopy-app repo (deployed at `mcp.trycanopy.ai`) — not in this SDK monorepo.
 
 The shared fixtures keep both languages locked to the same wire format — any drift fails CI.
 
