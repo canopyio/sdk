@@ -7,6 +7,7 @@ import {
   CanopyError,
 } from "./errors.js";
 import { getApprovalStatus, waitForApproval } from "./approval.js";
+import { verifyXPaymentMatchesOffer } from "./x402-decode.js";
 import type { CanopyFetchOptions } from "./types.js";
 
 /**
@@ -141,6 +142,11 @@ export async function canopyFetch(
 
   if (!xPaymentHeader) {
     throw new CanopyError("x402 signing returned no X-PAYMENT header");
+  }
+
+  const verified = verifyXPaymentMatchesOffer(xPaymentHeader, offer);
+  if (!verified.ok) {
+    throw new CanopyError(verified.reason);
   }
 
   const retryHeaders = new Headers(init?.headers ?? {});

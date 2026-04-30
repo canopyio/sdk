@@ -11,8 +11,8 @@ describe("config errors include dashboard URLs", () => {
     } catch (err) {
       const e = err as CanopyConfigError;
       expect(e).toBeInstanceOf(CanopyConfigError);
-      expect(e.dashboardUrl).toBe("https://www.trycanopy.ai/dashboard/settings");
-      expect(e.message).toContain("https://www.trycanopy.ai/dashboard/settings");
+      expect(e.dashboardUrl).toBe("https://trycanopy.ai/dashboard/settings");
+      expect(e.message).toContain("https://trycanopy.ai/dashboard/settings");
     }
   });
 
@@ -20,7 +20,7 @@ describe("config errors include dashboard URLs", () => {
     const canopy = new Canopy({ apiKey: "ak_test_x" });
     await expect(canopy.pay({ to: "0x" + "0".repeat(40), amountUsd: 1 })).rejects.toMatchObject({
       name: "CanopyConfigError",
-      dashboardUrl: "https://www.trycanopy.ai/dashboard/agents",
+      dashboardUrl: "https://trycanopy.ai/dashboard/agents",
     });
   });
 
@@ -36,7 +36,7 @@ describe("config errors include dashboard URLs", () => {
 });
 
 describe("API errors include dashboard URLs by status", () => {
-  function transportWith(status: number, body: unknown, baseUrl = "https://www.trycanopy.ai") {
+  function transportWith(status: number, body: unknown, baseUrl = "https://trycanopy.ai") {
     const fakeFetch: typeof fetch = async () =>
       new Response(JSON.stringify(body), {
         status,
@@ -50,7 +50,7 @@ describe("API errors include dashboard URLs by status", () => {
     await expect(t.request({ method: "GET", path: "/api/ping" })).rejects.toMatchObject({
       name: "CanopyApiError",
       status: 401,
-      dashboardUrl: "https://www.trycanopy.ai/dashboard/settings",
+      dashboardUrl: "https://trycanopy.ai/dashboard/settings",
     });
   });
 
@@ -58,7 +58,7 @@ describe("API errors include dashboard URLs by status", () => {
     const t = transportWith(403, { error: "forbidden" });
     await expect(t.request({ method: "GET", path: "/api/resolve" })).rejects.toMatchObject({
       status: 403,
-      dashboardUrl: "https://www.trycanopy.ai/dashboard/settings",
+      dashboardUrl: "https://trycanopy.ai/dashboard/settings",
     });
   });
 
@@ -68,7 +68,7 @@ describe("API errors include dashboard URLs by status", () => {
       t.request({ method: "GET", path: "/api/agents/agt_missing/budget" }),
     ).rejects.toMatchObject({
       status: 404,
-      dashboardUrl: "https://www.trycanopy.ai/dashboard/agents",
+      dashboardUrl: "https://trycanopy.ai/dashboard/agents",
     });
   });
 
@@ -88,7 +88,7 @@ describe("API errors include dashboard URLs by status", () => {
     } catch (err) {
       const e = err as CanopyApiError;
       expect(e.message).toContain("expired");
-      expect(e.message).toContain("https://www.trycanopy.ai/dashboard/settings");
+      expect(e.message).toContain("https://trycanopy.ai/dashboard/settings");
     }
   });
 });

@@ -1,6 +1,6 @@
 # canopy-ai
 
-Python client for [Canopy](https://www.trycanopy.ai). Give your AI agent a USDC treasury on Base, gated by a policy you set in the dashboard.
+Python client for [Canopy](https://trycanopy.ai). Give your AI agent a USDC treasury on Base, gated by a policy you set in the dashboard.
 
 ```bash
 pip install canopy-ai
@@ -10,7 +10,7 @@ Python 3.10+. Uses `httpx` for transport. `mypy --strict` passes on the library.
 
 ## Setup in 30 seconds
 
-After you've signed up at <https://www.trycanopy.ai> and added an agent:
+After you've signed up at <https://trycanopy.ai> and added an agent:
 
 1. Dashboard → **Settings** → copy your org API key (`ak_live_…`).
 2. Dashboard → **Agents** → copy the agent's `agt_…` id.
@@ -267,7 +267,7 @@ Canopy(
     *,
     api_key: str,                    # required
     agent_id: str | None = None,     # required for pay/preview/fetch/discover/ping/budget
-    base_url: str | None = None,     # default: https://www.trycanopy.ai
+    base_url: str | None = None,     # default: https://trycanopy.ai
     http_client: httpx.Client | None = None,
 )
 ```

@@ -54,7 +54,7 @@
         "status": 200,
         "body": {
           "signature": "0xfeedbeef",
-          "x_payment_header": "eyJ4NDAyVmVyc2lvbiI6MX0=",
+          "x_payment_header": "eyJ4NDAyVmVyc2lvbiI6MSwic2NoZW1lIjoiZXhhY3QiLCJuZXR3b3JrIjoiYmFzZSIsInBheWxvYWQiOnsic2lnbmF0dXJlIjoiMHhmZWVkYmVlZiIsImF1dGhvcml6YXRpb24iOnsiZnJvbSI6IjB4MTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMSIsInRvIjoiMHgyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwidmFsdWUiOiIxMDAwMDAiLCJ2YWxpZEFmdGVyIjoiMCIsInZhbGlkQmVmb3JlIjoiOTk5OTk5OTk5OSIsIm5vbmNlIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIn19fQ==",
           "transaction_id": "22222222-2222-2222-2222-222222222222"
         }
       }
@@ -64,7 +64,7 @@
         "method": "GET",
         "url": "https://paywalled.example.com/api/data",
         "headers": {
-          "x-payment": "eyJ4NDAyVmVyc2lvbiI6MX0="
+          "x-payment": "eyJ4NDAyVmVyc2lvbiI6MSwic2NoZW1lIjoiZXhhY3QiLCJuZXR3b3JrIjoiYmFzZSIsInBheWxvYWQiOnsic2lnbmF0dXJlIjoiMHhmZWVkYmVlZiIsImF1dGhvcml6YXRpb24iOnsiZnJvbSI6IjB4MTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMSIsInRvIjoiMHgyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwidmFsdWUiOiIxMDAwMDAiLCJ2YWxpZEFmdGVyIjoiMCIsInZhbGlkQmVmb3JlIjoiOTk5OTk5OTk5OSIsIm5vbmNlIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIn19fQ=="
         }
       },
       "response": {

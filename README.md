@@ -1,6 +1,6 @@
 # Canopy SDK
 
-[Canopy](https://www.trycanopy.ai) is a treasury wallet for AI agents. You fund a USDC wallet on Base; your agent spends from it, gated by per-agent policies you set in the dashboard (cap, allowlist, approval threshold). No private keys leave the server.
+[Canopy](https://trycanopy.ai) is a treasury wallet for AI agents. You fund a USDC wallet on Base; your agent spends from it, gated by per-agent policies you set in the dashboard (cap, allowlist, approval threshold). No private keys leave the server.
 
 ## Pick a package
 

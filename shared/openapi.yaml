@@ -8,7 +8,7 @@ info:
     routes on canopy-app are out of scope.
 
 servers:
-  - url: https://www.trycanopy.ai
+  - url: https://trycanopy.ai
     description: Production
   - url: http://localhost:3000
     description: Local dev (canopy-app on port 3000)

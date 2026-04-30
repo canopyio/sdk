@@ -16,13 +16,13 @@ describe("canopy.ping()", () => {
     const canopy = new Canopy({ apiKey: "ak_test_x" });
     await expect(canopy.ping()).rejects.toMatchObject({
       name: "CanopyConfigError",
-      dashboardUrl: "https://www.trycanopy.ai/dashboard/agents",
+      dashboardUrl: "https://trycanopy.ai/dashboard/agents",
     });
   });
 
   it("returns the structured response from /api/ping", async () => {
     const restore = withMockedFetch(async (url) => {
-      expect(url).toBe("https://www.trycanopy.ai/api/ping");
+      expect(url).toBe("https://trycanopy.ai/api/ping");
       return new Response(
         JSON.stringify({
           ok: true,
@@ -87,7 +87,7 @@ describe("canopy.ping()", () => {
       await expect(canopy.ping()).rejects.toMatchObject({
         name: "CanopyApiError",
         status: 401,
-        dashboardUrl: "https://www.trycanopy.ai/dashboard/settings",
+        dashboardUrl: "https://trycanopy.ai/dashboard/settings",
       });
     } finally {
       restore();

@@ -16,11 +16,11 @@ class TestBudget:
         canopy = Canopy(api_key="ak_test_x")
         with pytest.raises(CanopyConfigError) as exc:
             canopy.budget()
-        assert exc.value.dashboard_url == "https://www.trycanopy.ai/dashboard/agents"
+        assert exc.value.dashboard_url == "https://trycanopy.ai/dashboard/agents"
 
     def test_returns_budget_snapshot(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
-            assert str(request.url) == "https://www.trycanopy.ai/api/agents/agt_test/budget"
+            assert str(request.url) == "https://trycanopy.ai/api/agents/agt_test/budget"
             return httpx.Response(
                 200,
                 json={

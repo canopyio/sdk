@@ -26,7 +26,7 @@ function fakeTransport(opts: {
       headers: { "content-type": "application/json" },
     });
   };
-  return new Transport("https://www.trycanopy.ai", "ak_test_x", fakeFetch);
+  return new Transport("https://trycanopy.ai", "ak_test_x", fakeFetch);
 }
 
 function newCanopy(transport: Transport) {

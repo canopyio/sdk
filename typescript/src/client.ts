@@ -30,7 +30,7 @@ import { OpenAIAdapter } from "./adapters/openai.js";
 import { AnthropicAdapter } from "./adapters/anthropic.js";
 import { VercelAdapter } from "./adapters/vercel.js";
 
-const DEFAULT_BASE_URL = "https://www.trycanopy.ai";
+const DEFAULT_BASE_URL = "https://trycanopy.ai";
 const DEFAULT_CHAIN_ID = 8453;
 
 interface SignResponseBody {

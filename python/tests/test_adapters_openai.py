@@ -44,7 +44,7 @@ def _capture_transport(
         return httpx.Response(200, json={})
 
     return Transport(
-        "https://www.trycanopy.ai",
+        "https://trycanopy.ai",
         "ak_test_x",
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )

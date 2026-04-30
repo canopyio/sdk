@@ -1,7 +1,7 @@
 """Dashboard deep-link helpers for error messages.
 
 The Canopy API and dashboard share the same origin in production
-(``https://www.trycanopy.ai``); the dashboard sits under ``/dashboard``.
+(``https://trycanopy.ai``); the dashboard sits under ``/dashboard``.
 Helpers here derive deep-links from the configured ``base_url`` so error
 messages can point developers to the page that fixes the problem.
 """

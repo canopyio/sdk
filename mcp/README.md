@@ -1,12 +1,29 @@
 # @canopy-ai/mcp
 
-[Canopy](https://www.trycanopy.ai) as an [MCP](https://modelcontextprotocol.io) server. Use it from Claude Agent SDK, Claude Desktop, Cursor, Cline, or Windsurf to give an existing agent policy-gated payment tools.
+> **Internal package — not published to npm.**
+>
+> Canopy production deployments use **Remote MCP** at `https://mcp.trycanopy.ai/mcp`.
+> Every modern MCP host (claude.ai, ChatGPT, Claude Desktop, Cursor, VS Code, Zed,
+> Cline, Windsurf, Claude Agent SDK) speaks the remote HTTP transport — there is
+> no need for stdio.
+>
+> This package exists for Canopy's own development and CI workflows
+> (`agent-examples/claude-agent-sdk/` uses it for offline tests). The handler
+> module (`./handlers`) is shared with the remote server in `canopy-app`, so
+> tool definitions stay in sync.
+>
+> **Do not point users at this package.** Send them to the dashboard install
+> modal or `https://trycanopy.ai/documentation/connect`.
+
+---
+
+[Canopy](https://trycanopy.ai) as an [MCP](https://modelcontextprotocol.io) server. Internally used by Canopy contributors who want to run a stdio MCP server pointed at a local dev `canopy-app` for fixture testing.
 
 ## What this is for
 
 You're running an agent in Claude Agent SDK or inside a host app (Claude Desktop, Cursor, Cline, Windsurf) and you don't want to write a custom payment tool. MCP is the neutral plug. You add Canopy once, and the agent can discover services, check budget, request payments, and resolve chat-native approvals under the policy you set in Canopy.
 
-This is the **recommended path** for any MCP-aware agent runtime — one install, every host, zero code changes.
+This stdio binary is for **local development against a non-public Canopy instance**. Production users use the remote MCP URL above.
 
 ## When to use the language SDKs instead
 
@@ -21,7 +38,7 @@ The wire format is identical, so you can mix freely — e.g., MCP for the agent'
 
 ## Setup
 
-1. **Create an org** at <https://www.trycanopy.ai>.
+1. **Create an org** at <https://trycanopy.ai>.
 2. **Generate an API key**: Dashboard → Settings → API Keys → Create. Copy the `ak_live_…`.
 3. **Create an agent**: Dashboard → Agents → Connect agent. Pick an existing policy or create one in the flow, then copy the `agt_…` id.
 4. **Add Canopy to Claude Agent SDK or your MCP host config** (below).

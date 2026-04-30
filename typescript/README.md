@@ -1,6 +1,6 @@
 # @canopy-ai/sdk
 
-TypeScript / Node.js client for [Canopy](https://www.trycanopy.ai). Give your AI agent a USDC treasury on Base, gated by a policy you set in the dashboard.
+TypeScript / Node.js client for [Canopy](https://trycanopy.ai). Give your AI agent a USDC treasury on Base, gated by a policy you set in the dashboard.
 
 ```bash
 npm install @canopy-ai/sdk
@@ -10,7 +10,7 @@ Node 18+. Ships ESM + CJS. Zero runtime dependencies.
 
 ## Setup in 30 seconds
 
-After you've signed up at <https://www.trycanopy.ai> and added an agent:
+After you've signed up at <https://trycanopy.ai> and added an agent:
 
 1. Dashboard → **Settings** → copy your org API key (`ak_live_…`).
 2. Dashboard → **Agents** → copy the agent's `agt_…` id.
@@ -253,7 +253,7 @@ Subject to the same agent policy as `pay()`. Non-402 responses pass through unto
 new Canopy({
   apiKey: string;          // required
   agentId?: string;        // required for pay/preview/fetch/discover/ping/budget
-  baseUrl?: string;        // default: https://www.trycanopy.ai
+  baseUrl?: string;        // default: https://trycanopy.ai
 })
 ```
 

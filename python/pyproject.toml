@@ -38,7 +38,7 @@ langchain = ["langchain-core>=0.3"]
 openai-agents = ["openai-agents>=0.0.14"]
 
 [project.urls]
-Homepage = "https://www.trycanopy.ai"
+Homepage = "https://trycanopy.ai"
 Repository = "https://github.com/canopyio/sdk"
 Issues = "https://github.com/canopyio/sdk/issues"
 

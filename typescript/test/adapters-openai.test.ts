@@ -37,7 +37,7 @@ function fakeTransport(opts: {
       headers: { "content-type": "application/json" },
     });
   };
-  return new Transport("https://www.trycanopy.ai", "ak_test_x", fakeFetch);
+  return new Transport("https://trycanopy.ai", "ak_test_x", fakeFetch);
 }
 
 function newCanopy(transport: Transport) {
@@ -183,7 +183,7 @@ describe("canopy.openai.dispatch()", () => {
         headers: { "content-type": "text/plain" },
       });
     const canopy = newCanopy(
-      new Transport("https://www.trycanopy.ai", "ak_test_x", fakeFetch),
+      new Transport("https://trycanopy.ai", "ak_test_x", fakeFetch),
     );
     const messages = await canopy.openai.dispatch([
       {

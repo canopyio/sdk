@@ -18,7 +18,7 @@ class TestConfig:
     def test_missing_api_key_points_to_settings(self) -> None:
         with pytest.raises(CanopyConfigError) as exc:
             AsyncCanopy(api_key="")
-        assert exc.value.dashboard_url == "https://www.trycanopy.ai/dashboard/settings"
+        assert exc.value.dashboard_url == "https://trycanopy.ai/dashboard/settings"
 
     async def test_missing_agent_id_on_pay(self) -> None:
         canopy = AsyncCanopy(api_key="ak_test_x")
@@ -29,7 +29,7 @@ class TestConfig:
 class TestPay:
     async def test_allowed(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
-            assert str(request.url) == "https://www.trycanopy.ai/api/sign"
+            assert str(request.url) == "https://trycanopy.ai/api/sign"
             return httpx.Response(
                 200,
                 json={
@@ -107,7 +107,7 @@ class TestApiError:
         with pytest.raises(CanopyApiError) as exc:
             await canopy.ping()
         assert exc.value.status == 401
-        assert exc.value.dashboard_url == "https://www.trycanopy.ai/dashboard/settings"
+        assert exc.value.dashboard_url == "https://trycanopy.ai/dashboard/settings"
 
 
 class TestFetchX402:
@@ -144,12 +144,12 @@ class TestFetchX402:
                     200,
                     json={
                         "signature": "0xfeedbeef",
-                        "x_payment_header": "eyJ4NDAyVmVyc2lvbiI6MX0=",
+                        "x_payment_header": "eyJ4NDAyVmVyc2lvbiI6MSwic2NoZW1lIjoiZXhhY3QiLCJuZXR3b3JrIjoiYmFzZSIsInBheWxvYWQiOnsic2lnbmF0dXJlIjoiMHhmZWVkYmVlZiIsImF1dGhvcml6YXRpb24iOnsiZnJvbSI6IjB4MTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMSIsInRvIjoiMHgyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwidmFsdWUiOiIxMDAwMDAiLCJ2YWxpZEFmdGVyIjoiMCIsInZhbGlkQmVmb3JlIjoiOTk5OTk5OTk5OSIsIm5vbmNlIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIn19fQ==",
                         "transaction_id": "tx_x402",
                     },
                 )
             # Retry GET with X-PAYMENT
-            assert request.headers.get("x-payment") == "eyJ4NDAyVmVyc2lvbiI6MX0="
+            assert request.headers.get("x-payment") == "eyJ4NDAyVmVyc2lvbiI6MSwic2NoZW1lIjoiZXhhY3QiLCJuZXR3b3JrIjoiYmFzZSIsInBheWxvYWQiOnsic2lnbmF0dXJlIjoiMHhmZWVkYmVlZiIsImF1dGhvcml6YXRpb24iOnsiZnJvbSI6IjB4MTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMSIsInRvIjoiMHgyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwidmFsdWUiOiIxMDAwMDAiLCJ2YWxpZEFmdGVyIjoiMCIsInZhbGlkQmVmb3JlIjoiOTk5OTk5OTk5OSIsIm5vbmNlIjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIn19fQ=="
             return httpx.Response(200, json={"data": "premium"})
 
         canopy = AsyncCanopy(

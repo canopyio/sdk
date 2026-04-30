@@ -32,7 +32,7 @@ from canopy_ai.types import (
     PingResult,
 )
 
-_DEFAULT_BASE_URL = "https://www.trycanopy.ai"
+_DEFAULT_BASE_URL = "https://trycanopy.ai"
 _DEFAULT_CHAIN_ID = 8453
 
 

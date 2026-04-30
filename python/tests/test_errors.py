@@ -17,14 +17,14 @@ class TestConfigErrorDashboardUrls:
     def test_missing_api_key_points_to_settings(self) -> None:
         with pytest.raises(CanopyConfigError) as exc:
             Canopy(api_key="")
-        assert exc.value.dashboard_url == "https://www.trycanopy.ai/dashboard/settings"
-        assert "https://www.trycanopy.ai/dashboard/settings" in str(exc.value)
+        assert exc.value.dashboard_url == "https://trycanopy.ai/dashboard/settings"
+        assert "https://trycanopy.ai/dashboard/settings" in str(exc.value)
 
     def test_missing_agent_id_points_to_agents(self) -> None:
         canopy = Canopy(api_key="ak_test_x")
         with pytest.raises(CanopyConfigError) as exc:
             canopy.pay(to="0x" + "0" * 40, amount_usd=1.0)
-        assert exc.value.dashboard_url == "https://www.trycanopy.ai/dashboard/agents"
+        assert exc.value.dashboard_url == "https://trycanopy.ai/dashboard/agents"
 
     def test_custom_base_url_is_respected(self) -> None:
         with pytest.raises(CanopyConfigError) as exc:
@@ -35,38 +35,38 @@ class TestConfigErrorDashboardUrls:
 class TestApiErrorDashboardUrls:
     def test_401_points_to_settings(self) -> None:
         t = Transport(
-            "https://www.trycanopy.ai",
+            "https://trycanopy.ai",
             "ak_test_x",
             client=_client_returning(401, {"error": "invalid api key"}),
         )
         with pytest.raises(CanopyApiError) as exc:
             t.request("GET", "/api/ping")
         assert exc.value.status == 401
-        assert exc.value.dashboard_url == "https://www.trycanopy.ai/dashboard/settings"
+        assert exc.value.dashboard_url == "https://trycanopy.ai/dashboard/settings"
 
     def test_403_outside_expect_statuses_points_to_settings(self) -> None:
         t = Transport(
-            "https://www.trycanopy.ai",
+            "https://trycanopy.ai",
             "ak_test_x",
             client=_client_returning(403, {"error": "forbidden"}),
         )
         with pytest.raises(CanopyApiError) as exc:
             t.request("GET", "/api/resolve")
-        assert exc.value.dashboard_url == "https://www.trycanopy.ai/dashboard/settings"
+        assert exc.value.dashboard_url == "https://trycanopy.ai/dashboard/settings"
 
     def test_404_on_agents_path_points_to_agents(self) -> None:
         t = Transport(
-            "https://www.trycanopy.ai",
+            "https://trycanopy.ai",
             "ak_test_x",
             client=_client_returning(404, {"error": "agent not found"}),
         )
         with pytest.raises(CanopyApiError) as exc:
             t.request("GET", "/api/agents/agt_missing/budget")
-        assert exc.value.dashboard_url == "https://www.trycanopy.ai/dashboard/agents"
+        assert exc.value.dashboard_url == "https://trycanopy.ai/dashboard/agents"
 
     def test_500_has_no_dashboard_url(self) -> None:
         t = Transport(
-            "https://www.trycanopy.ai",
+            "https://trycanopy.ai",
             "ak_test_x",
             client=_client_returning(500, {"error": "boom"}),
         )
@@ -76,7 +76,7 @@ class TestApiErrorDashboardUrls:
 
     def test_message_includes_deep_link(self) -> None:
         t = Transport(
-            "https://www.trycanopy.ai",
+            "https://trycanopy.ai",
             "ak_test_x",
             client=_client_returning(401, {"error": "expired"}),
         )
@@ -84,4 +84,4 @@ class TestApiErrorDashboardUrls:
             t.request("GET", "/api/ping")
         msg = str(exc.value)
         assert "expired" in msg
-        assert "https://www.trycanopy.ai/dashboard/settings" in msg
+        assert "https://trycanopy.ai/dashboard/settings" in msg

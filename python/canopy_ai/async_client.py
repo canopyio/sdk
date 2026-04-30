@@ -40,6 +40,7 @@ from canopy_ai.errors import (
 )
 from canopy_ai.discover import build_query as _build_discover_query
 from canopy_ai.discover import map_response as _map_discover_response
+from canopy_ai.x402_decode import verify_x_payment_matches_offer
 from canopy_ai.types import (
     ApprovalStatus,
     BudgetSnapshot,
@@ -51,7 +52,7 @@ from canopy_ai.types import (
     PingResult,
 )
 
-_DEFAULT_BASE_URL = "https://www.trycanopy.ai"
+_DEFAULT_BASE_URL = "https://trycanopy.ai"
 _DEFAULT_CHAIN_ID = 8453
 
 
@@ -426,6 +427,10 @@ class AsyncCanopy:
             x_payment_header = base64.b64encode(
                 json.dumps(x_payment_header).encode()
             ).decode()
+
+        ok, reason = verify_x_payment_matches_offer(x_payment_header, offer)
+        if not ok:
+            raise CanopyError(reason or "X-PAYMENT verification failed")
 
         retry_headers = dict(req_headers)
         retry_headers["X-PAYMENT"] = x_payment_header

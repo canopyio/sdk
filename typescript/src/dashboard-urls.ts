@@ -1,6 +1,6 @@
 /**
  * The Canopy API and dashboard share the same origin in production
- * (`https://www.trycanopy.ai`). The dashboard sits under `/dashboard`. Helpers
+ * (`https://trycanopy.ai`). The dashboard sits under `/dashboard`. Helpers
  * here derive deep-links from the configured `baseUrl` so error messages can
  * point developers to the page that fixes the problem.
  */

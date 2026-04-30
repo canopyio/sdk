@@ -16,13 +16,13 @@ describe("canopy.budget()", () => {
     const canopy = new Canopy({ apiKey: "ak_test_x" });
     await expect(canopy.budget()).rejects.toMatchObject({
       name: "CanopyConfigError",
-      dashboardUrl: "https://www.trycanopy.ai/dashboard/agents",
+      dashboardUrl: "https://trycanopy.ai/dashboard/agents",
     });
   });
 
   it("hits /api/agents/{id}/budget and maps the response to camelCase", async () => {
     const restore = withMockedFetch(async (url) => {
-      expect(url).toBe("https://www.trycanopy.ai/api/agents/agt_test/budget");
+      expect(url).toBe("https://trycanopy.ai/api/agents/agt_test/budget");
       return new Response(
         JSON.stringify({
           agent_id: "agt_test",

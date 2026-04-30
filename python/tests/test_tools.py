@@ -33,7 +33,7 @@ def _capture_client(captured: dict[str, Any]) -> httpx.Client:
 def _new_canopy(captured: dict[str, Any]) -> Canopy:
     canopy = Canopy(api_key="ak_test_x", agent_id="agt_test")
     canopy._transport = Transport(  # noqa: SLF001
-        "https://www.trycanopy.ai", "ak_test_x", client=_capture_client(captured)
+        "https://trycanopy.ai", "ak_test_x", client=_capture_client(captured)
     )
     return canopy
 

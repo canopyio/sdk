@@ -16,6 +16,7 @@ from canopy_ai.errors import (
     CanopyError,
 )
 from canopy_ai.transport import Transport
+from canopy_ai.x402_decode import verify_x_payment_matches_offer
 
 
 def canopy_fetch(
@@ -124,6 +125,10 @@ def canopy_fetch(
         x_payment_header = base64.b64encode(
             json.dumps(x_payment_header).encode()
         ).decode()
+
+    ok, reason = verify_x_payment_matches_offer(x_payment_header, offer)
+    if not ok:
+        raise CanopyError(reason or "X-PAYMENT verification failed")
 
     retry_headers = dict(req_headers)
     retry_headers["X-PAYMENT"] = x_payment_header
