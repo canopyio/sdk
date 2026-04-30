@@ -57,6 +57,8 @@ export interface ApprovalStatus {
   transactionId: string;
   /** For x402 transactions resumed after approval, the X-PAYMENT header to retry the resource URL. */
   xPaymentHeader: string | null;
+  /** For MPP transactions resumed after approval, the credential to put in the `Authorization: Payment <…>` retry header. */
+  mppPaymentHeader: string | null;
 }
 
 export interface WaitForApprovalOptions {

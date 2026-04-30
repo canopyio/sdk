@@ -1,11 +1,12 @@
 openapi: 3.1.0
 info:
   title: Canopy SDK API
-  version: 0.1.0
+  version: 0.2.0
   description: |
-    HTTP contract consumed by the Canopy SDKs (TS, Python, MCP).
-    Only documents the endpoints an SDK actually calls — dashboard/webhook
-    routes on canopy-app are out of scope.
+    HTTP contract consumed by the Canopy SDKs (TS, Python, MCP) and the
+    `create-canopy-agent` CLI scaffolder. Only documents the endpoints an
+    SDK or CLI actually calls — dashboard/webhook routes on canopy-app are
+    out of scope unless they're also exposed to API-key callers.
 
 servers:
   - url: https://trycanopy.ai
@@ -33,7 +34,7 @@ components:
           example: agt_xxxxxxxx
         type:
           type: string
-          enum: [eip3009, permit2, raw_transaction]
+          enum: [eip3009, permit2, raw_transaction, x402, mpp]
           default: raw_transaction
         chain_id:
           type: integer
@@ -144,6 +145,103 @@ components:
         entity:
           type: object
 
+    MeResponse:
+      type: object
+      required: [org_id]
+      properties:
+        org_id:
+          type: string
+        org_name:
+          type: string
+          nullable: true
+        treasury_address:
+          type: string
+          nullable: true
+        treasury_provisioned:
+          type: boolean
+
+    CreatePolicyRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        spend_cap_usd:
+          type: number
+          nullable: true
+        cap_period_hours:
+          type: integer
+          default: 24
+        approval_required:
+          type: boolean
+          default: false
+          description: |
+            When false, all payments under the spend cap auto-approve regardless of
+            `approval_threshold_usd`. Set true to gate single payments above the
+            threshold for human approval.
+        approval_threshold_usd:
+          type: number
+          nullable: true
+          description: Single-payment threshold above which approval is required. Only enforced when `approval_required = true`.
+        allowlist_addresses:
+          type: array
+          items:
+            type: string
+          nullable: true
+
+    CreatePolicyResponse:
+      type: object
+      required: [policy_id]
+      properties:
+        policy_id:
+          type: string
+          format: uuid
+        policy:
+          type: object
+
+    CreateAgentRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        policyId:
+          type: string
+          format: uuid
+          nullable: true
+          description: If omitted, the agent is bound to the org's default policy.
+
+    CreateAgentResponse:
+      type: object
+      required: [agentId]
+      properties:
+        agentId:
+          type: string
+          example: agt_a7x9k2m4
+        agentUuid:
+          type: string
+          format: uuid
+        policyId:
+          type: string
+          format: uuid
+          nullable: true
+        signerStatus:
+          type: string
+        primaryKey:
+          type: object
+          nullable: true
+          properties:
+            keyPrefix:
+              type: string
+            plaintext:
+              type: string
+
 paths:
   /api/sign:
     post:
@@ -253,3 +351,79 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ResolveResponse'
+
+  /api/me:
+    get:
+      summary: API-key validation + org context
+      description: |
+        Returns the org name and treasury address for the bearer key. Used by
+        `npx create-canopy-agent` to confirm the user pasted a valid key and
+        is connected to the right org before creating a policy + agent.
+      responses:
+        '200':
+          description: Validated; returns org context
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          description: Invalid or revoked API key
+        '404':
+          description: Organization not found
+
+  /api/policies:
+    post:
+      summary: Create a policy (API-key auth)
+      description: |
+        Creates a policy in the bearer key's org. Used by `create-canopy-agent`
+        to provision a starter-preset policy before binding it to a freshly
+        created agent. `approval_required = false` means all payments under
+        the spend cap auto-approve.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePolicyRequest'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatePolicyResponse'
+        '400':
+          description: Missing or invalid fields
+        '401':
+          description: Invalid API key
+
+  /api/agents:
+    post:
+      summary: Create an agent
+      description: |
+        Creates a Canopy agent identity bound to the org treasury. Accepts
+        either a Clerk session (dashboard "Connect agent" flow) or an org
+        API key (`Authorization: Bearer ak_live_...`, used by
+        `create-canopy-agent`). For API-key callers, the audit `user_id`
+        resolves to the org's first admin via Clerk.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAgentRequest'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAgentResponse'
+        '400':
+          description: Missing or invalid fields
+        '401':
+          description: Unauthorized
+        '404':
+          description: Organization or referenced policy not found
+        '503':
+          description: Org treasury is not provisioned

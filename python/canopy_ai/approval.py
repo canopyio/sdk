@@ -22,6 +22,7 @@ def get_approval_status(transport: Transport, approval_id: str) -> ApprovalStatu
         expires_at=body["expires_at"],
         transaction_id=body["transaction_id"],
         x_payment_header=body.get("x_payment_header"),
+        mpp_payment_header=body.get("mpp_payment_header"),
     )
 
 

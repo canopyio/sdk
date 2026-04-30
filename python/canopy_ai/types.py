@@ -46,6 +46,8 @@ class ApprovalStatus(TypedDict):
     transaction_id: str
     #: For x402 transactions resumed after approval, the X-PAYMENT header to retry the resource URL.
     x_payment_header: str | None
+    #: For MPP transactions resumed after approval, the credential to put in the ``Authorization: Payment <…>`` retry header.
+    mpp_payment_header: NotRequired[str | None]
 
 
 class DecideApprovalResult(TypedDict):

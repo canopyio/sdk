@@ -1,0 +1,40 @@
+{
+  "name": "create-canopy-agent",
+  "version": "0.1.0",
+  "description": "Scaffold a pre-configured Canopy agent starter (trading, research, lead-gen, content, treasury, travel).",
+  "type": "module",
+  "bin": {
+    "create-canopy-agent": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc && node scripts/copy-templates.mjs",
+    "typecheck": "tsc --noEmit",
+    "start": "tsx src/cli.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "canopy",
+    "agent",
+    "starter",
+    "scaffold",
+    "claude-agent-sdk",
+    "ai-agents",
+    "x402"
+  ],
+  "license": "MIT"
+}

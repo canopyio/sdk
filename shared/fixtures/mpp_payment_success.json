@@ -1,0 +1,70 @@
+{
+  "name": "mpp_payment_success",
+  "description": "canopy.fetch() against an MPP-paywalled URL: 402 with WWW-Authenticate: Payment → /api/sign returns mpp_payment_header → retry with Authorization: Payment succeeds.",
+  "config": {
+    "apiKey": "ak_live_test",
+    "agentId": "agt_test",
+    "baseUrl": "https://api.canopy.test"
+  },
+  "call": {
+    "method": "fetch",
+    "args": { "url": "https://parallelmpp.example.com/api/search" }
+  },
+  "httpExchange": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://parallelmpp.example.com/api/search"
+      },
+      "response": {
+        "status": 402,
+        "headers": {
+          "content-type": "application/json",
+          "www-authenticate": "Payment id=\"chal_test_1\", realm=\"parallelmpp.example.com\", method=\"tempo\", intent=\"charge\", request=\"eyJhbW91bnQiOiIxMDAwMCIsImN1cnJlbmN5IjoiMHgyMGMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwYjk1MzdkMTFjNjBlOGI1MCIsIm1ldGhvZERldGFpbHMiOnsiY2hhaW5JZCI6NDIxN30sInJlY2lwaWVudCI6IjB4NTY4YmI4OWNkMjVjODg4MmEwNGIxNjBiMmJjZWY2ZjUwNDBhYWQ3MSJ9\", expires=\"2099-12-31T23:59:59.000Z\""
+        },
+        "body": { "error": "Payment required" }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.canopy.test/api/sign",
+        "headers": {
+          "authorization": "Bearer ak_live_test",
+          "content-type": "application/json"
+        },
+        "bodyMatches": {
+          "agent_id": "agt_test",
+          "type": "mpp",
+          "chain_id": 4217,
+          "recipient_address": "0x568bb89cd25c8882a04b160b2bcef6f5040aad71"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "signature": "0xfeedbeef",
+          "mpp_payment_header": "eyJjaGFsbGVuZ2UiOnsiaWQiOiJjaGFsX3Rlc3RfMSIsInJlYWxtIjoicGFyYWxsZWxtcHAuZXhhbXBsZS5jb20iLCJtZXRob2QiOiJ0ZW1wbyIsImludGVudCI6ImNoYXJnZSIsImV4cGlyZXMiOiIyMDk5LTEyLTMxVDIzOjU5OjU5LjAwMFoiLCJyZXF1ZXN0IjoiZXlKaGJXOTFiblFpT2lJeE1EQXdNQ0lzSW1OMWNuSmxibU41SWpvaU1IZ3lNR013TURBd01EQXdNREF3TURBd01EQXdNREF3TUdJNU5UTTNaREV4WXpZd1pUaGlOVEFpTENKdFpYUm9iMlJFWlhSaGFXeHpJanA3SW1Ob1lXbHVTV1FpT2pReU1UZDlMQ0p5WldOcGNHbGxiblFpT2lJd2VEVTJPR0ppT0RsalpESTFZemc0T0RKaE1EUmlNVFl3WWpKaVkyVm1ObVkxTURRd1lXRmtOekVpZlEifSwicGF5bG9hZCI6eyJ0eXBlIjoidHJhbnNhY3Rpb24iLCJzaWduYXR1cmUiOiIweGZlZWRiZWVmIn0sInNvdXJjZSI6ImRpZDpwa2g6ZWlwMTU1OjQyMTc6MHgxMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExIn0",
+          "transaction_id": "33333333-3333-3333-3333-333333333333"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://parallelmpp.example.com/api/search",
+        "headers": {
+          "authorization": "Payment eyJjaGFsbGVuZ2UiOnsiaWQiOiJjaGFsX3Rlc3RfMSIsInJlYWxtIjoicGFyYWxsZWxtcHAuZXhhbXBsZS5jb20iLCJtZXRob2QiOiJ0ZW1wbyIsImludGVudCI6ImNoYXJnZSIsImV4cGlyZXMiOiIyMDk5LTEyLTMxVDIzOjU5OjU5LjAwMFoiLCJyZXF1ZXN0IjoiZXlKaGJXOTFiblFpT2lJeE1EQXdNQ0lzSW1OMWNuSmxibU41SWpvaU1IZ3lNR013TURBd01EQXdNREF3TURBd01EQXdNREF3TUdJNU5UTTNaREV4WXpZd1pUaGlOVEFpTENKdFpYUm9iMlJFWlhSaGFXeHpJanA3SW1Ob1lXbHVTV1FpT2pReU1UZDlMQ0p5WldOcGNHbGxiblFpT2lJd2VEVTJPR0ppT0RsalpESTFZemc0T0RKaE1EUmlNVFl3WWpKaVkyVm1ObVkxTURRd1lXRmtOekVpZlEifSwicGF5bG9hZCI6eyJ0eXBlIjoidHJhbnNhY3Rpb24iLCJzaWduYXR1cmUiOiIweGZlZWRiZWVmIn0sInNvdXJjZSI6ImRpZDpwa2g6ZWlwMTU1OjQyMTc6MHgxMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExIn0"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": { "results": [{ "title": "ok" }] }
+      }
+    }
+  ],
+  "expectedFetch": {
+    "status": 200,
+    "bodyEquals": { "results": [{ "title": "ok" }] }
+  }
+}

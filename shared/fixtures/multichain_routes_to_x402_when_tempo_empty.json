@@ -1,0 +1,99 @@
+{
+  "name": "multichain_routes_to_x402_when_tempo_empty",
+  "description": "Server advertises both MPP-on-Tempo (WWW-Authenticate: Payment) and x402-on-Base (body.accepts). Treasury has $10 on Base, $0 on Tempo. The SDK fetches per-chain balances, finds Tempo can't cover the $0.01 charge, falls through to the x402-on-Base candidate, and completes the payment with X-PAYMENT.",
+  "config": {
+    "apiKey": "ak_live_test",
+    "agentId": "agt_test",
+    "baseUrl": "https://api.canopy.test"
+  },
+  "call": {
+    "method": "fetch",
+    "args": { "url": "https://multichain.example.com/api/data" }
+  },
+  "httpExchange": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://multichain.example.com/api/data"
+      },
+      "response": {
+        "status": 402,
+        "headers": {
+          "content-type": "application/json",
+          "www-authenticate": "Payment id=\"chal_mc_1\", realm=\"multichain.example.com\", method=\"tempo\", intent=\"charge\", request=\"eyJhbW91bnQiOiIxMDAwMCIsImN1cnJlbmN5IjoiMHgyMGMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwYjk1MzdkMTFjNjBlOGI1MCIsIm1ldGhvZERldGFpbHMiOnsiY2hhaW5JZCI6NDIxN30sInJlY2lwaWVudCI6IjB4NTY4YmI4OWNkMjVjODg4MmEwNGIxNjBiMmJjZWY2ZjUwNDBhYWQ3MSJ9\", expires=\"2099-12-31T23:59:59.000Z\""
+        },
+        "body": {
+          "x402Version": 2,
+          "accepts": [
+            {
+              "scheme": "exact",
+              "network": "eip155:8453",
+              "amount": "10000",
+              "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              "payTo": "0xd0c4d25cdf60cec4ade0fc45c3bb1ac5658fb246",
+              "maxTimeoutSeconds": 300,
+              "extra": { "name": "USD Coin", "version": "2" }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.canopy.test/api/balances/by-chain",
+        "headers": { "authorization": "Bearer ak_live_test" }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "balances": [
+            { "chainId": 8453, "chainName": "base", "usdcBalance": "10.00" },
+            { "chainId": 4217, "chainName": "tempo", "usdcBalance": "0" }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.canopy.test/api/sign",
+        "headers": {
+          "authorization": "Bearer ak_live_test",
+          "content-type": "application/json"
+        },
+        "bodyMatches": {
+          "agent_id": "agt_test",
+          "type": "x402",
+          "chain_id": 8453,
+          "recipient_address": "0xd0c4d25cdf60cec4ade0fc45c3bb1ac5658fb246"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "signature": "0xfeedbeef",
+          "x_payment_header": "eyJ4NDAyVmVyc2lvbiI6Miwic2NoZW1lIjoiZXhhY3QiLCJuZXR3b3JrIjoiZWlwMTU1Ojg0NTMiLCJwYXlsb2FkIjp7InNpZ25hdHVyZSI6IjB4ZmVlZGJlZWYiLCJhdXRob3JpemF0aW9uIjp7ImZyb20iOiIweDExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMSIsInRvIjoiMHhkMGM0ZDI1Y2RmNjBjZWM0YWRlMGZjNDVjM2JiMWFjNTY1OGZiMjQ2IiwidmFsdWUiOiIxMDAwMCIsInZhbGlkQWZ0ZXIiOiIwIiwidmFsaWRCZWZvcmUiOiI5OTk5OTk5OTk5Iiwibm9uY2UiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIn19fQ==",
+          "transaction_id": "44444444-4444-4444-4444-444444444444"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://multichain.example.com/api/data",
+        "headers": {
+          "x-payment": "eyJ4NDAyVmVyc2lvbiI6Miwic2NoZW1lIjoiZXhhY3QiLCJuZXR3b3JrIjoiZWlwMTU1Ojg0NTMiLCJwYXlsb2FkIjp7InNpZ25hdHVyZSI6IjB4ZmVlZGJlZWYiLCJhdXRob3JpemF0aW9uIjp7ImZyb20iOiIweDExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMSIsInRvIjoiMHhkMGM0ZDI1Y2RmNjBjZWM0YWRlMGZjNDVjM2JiMWFjNTY1OGZiMjQ2IiwidmFsdWUiOiIxMDAwMCIsInZhbGlkQWZ0ZXIiOiIwIiwidmFsaWRCZWZvcmUiOiI5OTk5OTk5OTk5Iiwibm9uY2UiOiIweDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIn19fQ=="
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": { "data": "ok" }
+      }
+    }
+  ],
+  "expectedFetch": {
+    "status": 200,
+    "bodyEquals": { "data": "ok" }
+  }
+}

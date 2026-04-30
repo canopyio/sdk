@@ -40,6 +40,12 @@ from canopy_ai.errors import (
 )
 from canopy_ai.discover import build_query as _build_discover_query
 from canopy_ai.discover import map_response as _map_discover_response
+from canopy_ai.fetch import (
+    _Candidate,
+    _atomic_to_usd,
+    _chain_id_for_x402_network,
+)
+from canopy_ai.mpp_decode import MppChallenge, parse_mpp_challenge
 from canopy_ai.x402_decode import verify_x_payment_matches_offer
 from canopy_ai.types import (
     ApprovalStatus,
@@ -178,6 +184,7 @@ class AsyncCanopy:
             "expires_at": body["expires_at"],
             "transaction_id": body["transaction_id"],
             "x_payment_header": body.get("x_payment_header"),
+            "mpp_payment_header": body.get("mpp_payment_header"),
         }
 
     async def wait_for_approval(
@@ -331,12 +338,18 @@ class AsyncCanopy:
         content: Any = None,
         wait_for_approval: bool | int = False,
     ) -> httpx.Response:
-        """Like httpx.request, but transparently handles HTTP 402 via x402.
+        """Like httpx.request, but transparently handles HTTP 402 via x402 or MPP.
+
+        Recognizes both the x402 body envelope (``accepts[]``) and the MPP
+        ``WWW-Authenticate: Payment`` header. When a 402 advertises both,
+        balances are fetched from ``/api/balances/by-chain`` and the funded
+        chain is chosen.
 
         On a pending_approval policy outcome:
           - default: raises :class:`CanopyApprovalRequiredError`
           - ``wait_for_approval=True`` or an int (ms): polls the approval
-            status, recovers the X-PAYMENT header on approve, retries the URL
+            status, recovers the appropriate payment header on approve,
+            retries the URL.
         """
         from canopy_ai.errors import (
             CanopyApprovalDeniedError,
@@ -355,27 +368,133 @@ class AsyncCanopy:
                 "fetch() requires an agent_id in the AsyncCanopy constructor"
             )
 
-        try:
-            reqs = first.json()
-        except ValueError:
-            return first
-        accepts = reqs.get("accepts") if isinstance(reqs, dict) else None
-        if not isinstance(accepts, list):
-            return first
-        offer = next(
-            (a for a in accepts if a.get("scheme") == "exact" and a.get("network") == "base"),
-            None,
-        )
-        if not offer:
+        candidates = self._enumerate_candidates(first)
+        chosen = await self._choose_candidate(candidates)
+        if chosen is None:
             return first
 
+        if chosen.source == "mpp":
+            return await self._retry_with_mpp(
+                method,
+                url,
+                req_headers,
+                content,
+                chosen.mpp_challenge,  # type: ignore[arg-type]
+                wait_for_approval=wait_for_approval,
+            )
+        return await self._retry_with_x402(
+            method,
+            url,
+            req_headers,
+            content,
+            chosen.x402_offer,  # type: ignore[arg-type]
+            chosen.x402_reqs,  # type: ignore[arg-type]
+            wait_for_approval=wait_for_approval,
+        )
+
+    def _enumerate_candidates(self, first: httpx.Response) -> list[_Candidate]:
+        candidates: list[_Candidate] = []
+        mpp = parse_mpp_challenge(first.headers)
+        if mpp and mpp["method"] == "tempo" and mpp["intent"] == "charge":
+            amount_usd = _atomic_to_usd(mpp["request"]["amount"])
+            if amount_usd is not None:
+                candidates.append(
+                    _Candidate(
+                        source="mpp",
+                        chain_id=mpp["request"]["methodDetails"]["chainId"],
+                        amount_usd=amount_usd,
+                        mpp_challenge=mpp,
+                    )
+                )
+        try:
+            reqs = first.json()
+        except (ValueError, json.JSONDecodeError):
+            return candidates
+        if isinstance(reqs, dict):
+            accepts = reqs.get("accepts")
+            if isinstance(accepts, list):
+                for offer in accepts:
+                    if not isinstance(offer, dict) or offer.get("scheme") != "exact":
+                        continue
+                    network = offer.get("network")
+                    if not isinstance(network, str):
+                        continue
+                    chain_id = _chain_id_for_x402_network(network)
+                    if chain_id is None:
+                        continue
+                    atomic = offer.get("amount") or offer.get("maxAmountRequired")
+                    if not isinstance(atomic, str):
+                        continue
+                    amount_usd = _atomic_to_usd(atomic)
+                    if amount_usd is None:
+                        continue
+                    candidates.append(
+                        _Candidate(
+                            source="x402",
+                            chain_id=chain_id,
+                            amount_usd=amount_usd,
+                            x402_offer=offer,
+                            x402_reqs=reqs,
+                        )
+                    )
+        return candidates
+
+    async def _choose_candidate(
+        self, candidates: list[_Candidate]
+    ) -> _Candidate | None:
+        """Async parallel of fetch._choose_candidate. Skips the balance
+        round-trip when there's only one candidate."""
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        balances = await self._fetch_balances_by_chain()
+        if balances is None:
+            return candidates[0]
+        balance_map: dict[int, float] = {}
+        for b in balances:
+            try:
+                balance_map[int(b["chainId"])] = float(b.get("usdcBalance", "0") or 0)
+            except (TypeError, ValueError):
+                continue
+        for c in candidates:
+            if balance_map.get(c.chain_id, 0.0) >= c.amount_usd:
+                return c
+        return candidates[0]
+
+    async def _fetch_balances_by_chain(self) -> list[dict[str, Any]] | None:
+        try:
+            _, body = await self._request(
+                "GET",
+                "/api/balances/by-chain",
+                expect_statuses=[200],
+            )
+        except Exception:
+            return None
+        if not isinstance(body, dict):
+            return None
+        balances = body.get("balances")
+        return balances if isinstance(balances, list) else None
+
+    async def _retry_with_x402(
+        self,
+        method: str,
+        url: str,
+        req_headers: dict[str, str],
+        content: Any,
+        offer: dict[str, Any],
+        reqs: dict[str, Any],
+        *,
+        wait_for_approval: bool | int,
+    ) -> httpx.Response:
+        chain_id = _chain_id_for_x402_network(offer.get("network", "base")) or 8453
         sign_status, sign_body = await self._request(
             "POST",
             "/api/sign",
             json={
                 "agent_id": self.agent_id,
                 "type": "x402",
-                "chain_id": 8453,
+                "chain_id": chain_id,
                 "recipient_address": offer["payTo"],
                 "payload": {"x402": offer, "x402Version": reqs.get("x402Version", 1)},
             },
@@ -383,60 +502,104 @@ class AsyncCanopy:
         )
         assert isinstance(sign_body, dict)
 
-        x_payment_header: Any = None
-
-        if sign_status == 202:
-            approval_id = sign_body.get("approval_request_id")
-            transaction_id = sign_body.get("transaction_id")
-            if not approval_id or not transaction_id:
-                raise CanopyError("Sign returned 202 without approval_request_id")
-
-            if not wait_for_approval:
-                raise CanopyApprovalRequiredError(
-                    sign_body.get("reason", "Approval required"),
-                    approval_id=approval_id,
-                    transaction_id=transaction_id,
-                    recipient_name=sign_body.get("recipient_name"),
-                    amount_usd=sign_body.get("amount_usd"),
-                    agent_name=sign_body.get("agent_name"),
-                    expires_at=sign_body.get("expires_at"),
-                    chat_approval_enabled=sign_body.get("chat_approval_enabled", True),
-                )
-
-            timeout_ms = (
-                wait_for_approval
-                if isinstance(wait_for_approval, int) and wait_for_approval > 0
-                else 5 * 60 * 1000
-            )
-            decided = await self.wait_for_approval(approval_id, timeout_ms=timeout_ms)
-            if decided["status"] == "denied":
-                raise CanopyApprovalDeniedError(approval_id, transaction_id)
-            if decided["status"] == "expired":
-                raise CanopyApprovalExpiredError(approval_id, transaction_id)
-            x_payment_header = decided.get("x_payment_header")
-            if not x_payment_header:
-                refreshed = await self.get_approval_status(approval_id)
-                x_payment_header = refreshed.get("x_payment_header")
-        else:
-            x_payment_header = sign_body.get("x_payment_header")
-
+        x_payment_header = await self._resolve_payment_header(
+            sign_status, sign_body, "x_payment_header", wait_for_approval=wait_for_approval
+        )
         if not x_payment_header:
             raise CanopyError("x402 signing returned no X-PAYMENT header")
-
         if not isinstance(x_payment_header, str):
             x_payment_header = base64.b64encode(
                 json.dumps(x_payment_header).encode()
             ).decode()
-
         ok, reason = verify_x_payment_matches_offer(x_payment_header, offer)
         if not ok:
             raise CanopyError(reason or "X-PAYMENT verification failed")
-
         retry_headers = dict(req_headers)
         retry_headers["X-PAYMENT"] = x_payment_header
         return await self._client.request(
             method, url, headers=retry_headers, content=content
         )
+
+    async def _retry_with_mpp(
+        self,
+        method: str,
+        url: str,
+        req_headers: dict[str, str],
+        content: Any,
+        challenge: MppChallenge,
+        *,
+        wait_for_approval: bool | int,
+    ) -> httpx.Response:
+        sign_status, sign_body = await self._request(
+            "POST",
+            "/api/sign",
+            json={
+                "agent_id": self.agent_id,
+                "type": "mpp",
+                "chain_id": challenge["request"]["methodDetails"]["chainId"],
+                "recipient_address": challenge["request"]["recipient"],
+                "payload": {"mpp_challenge": challenge},
+            },
+            expect_statuses=[200, 202],
+        )
+        assert isinstance(sign_body, dict)
+        payment_header = await self._resolve_payment_header(
+            sign_status, sign_body, "mpp_payment_header", wait_for_approval=wait_for_approval
+        )
+        if not payment_header:
+            raise CanopyError("MPP signing returned no Payment header")
+        retry_headers = dict(req_headers)
+        retry_headers["Authorization"] = f"Payment {payment_header}"
+        return await self._client.request(
+            method, url, headers=retry_headers, content=content
+        )
+
+    async def _resolve_payment_header(
+        self,
+        sign_status: int,
+        sign_body: dict[str, Any],
+        header_field: str,
+        *,
+        wait_for_approval: bool | int,
+    ) -> str | None:
+        from canopy_ai.errors import (
+            CanopyApprovalDeniedError,
+            CanopyApprovalExpiredError,
+            CanopyApprovalRequiredError,
+        )
+        if sign_status == 200:
+            return sign_body.get(header_field)
+        approval_id = sign_body.get("approval_request_id")
+        transaction_id = sign_body.get("transaction_id")
+        if not approval_id or not transaction_id:
+            raise CanopyError("Sign returned 202 without approval_request_id")
+        if not wait_for_approval:
+            raise CanopyApprovalRequiredError(
+                sign_body.get("reason", "Approval required"),
+                approval_id=approval_id,
+                transaction_id=transaction_id,
+                recipient_name=sign_body.get("recipient_name"),
+                amount_usd=sign_body.get("amount_usd"),
+                agent_name=sign_body.get("agent_name"),
+                expires_at=sign_body.get("expires_at"),
+                chat_approval_enabled=sign_body.get("chat_approval_enabled", True),
+            )
+        timeout_ms = (
+            wait_for_approval
+            if isinstance(wait_for_approval, int) and wait_for_approval > 0
+            else 5 * 60 * 1000
+        )
+        decided = await self.wait_for_approval(approval_id, timeout_ms=timeout_ms)
+        if decided["status"] == "denied":
+            raise CanopyApprovalDeniedError(approval_id, transaction_id)
+        if decided["status"] == "expired":
+            raise CanopyApprovalExpiredError(approval_id, transaction_id)
+        pick = decided.get(header_field)
+        if isinstance(pick, str) and pick:
+            return pick
+        refreshed = await self.get_approval_status(approval_id)
+        refreshed_pick = refreshed.get(header_field)
+        return refreshed_pick if isinstance(refreshed_pick, str) else None
 
     # ---------------------------------------------------------------- helpers
 

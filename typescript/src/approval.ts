@@ -15,6 +15,7 @@ interface ApprovalStatusResponse {
   expires_at: string;
   transaction_id: string;
   x_payment_header: string | null;
+  mpp_payment_header?: string | null;
 }
 
 export async function getApprovalStatus(
@@ -32,6 +33,7 @@ export async function getApprovalStatus(
     expiresAt: body.expires_at,
     transactionId: body.transaction_id,
     xPaymentHeader: body.x_payment_header ?? null,
+    mppPaymentHeader: body.mpp_payment_header ?? null,
   };
 }
 
