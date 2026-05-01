@@ -1,7 +1,7 @@
 {
   "name": "canopy-ai-monorepo",
   "version": "0.0.0",
-  "private": true,
+  "private": false,
   "description": "Monorepo for @canopy-ai/sdk (TypeScript) and canopy-ai (Python).",
   "workspaces": [
     "typescript"
