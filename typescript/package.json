@@ -1,6 +1,6 @@
 {
   "name": "@canopy-ai/sdk",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Client library for Canopy — org treasury wallets with agent-level policy-gated spending.",
   "license": "MIT",
   "repository": {

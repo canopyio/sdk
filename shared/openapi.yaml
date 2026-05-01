@@ -4,7 +4,7 @@ info:
   version: 0.2.0
   description: |
     HTTP contract consumed by the Canopy SDKs (TS, Python, MCP) and the
-    `create-canopy-agent` CLI scaffolder. Only documents the endpoints an
+    `@canopy-ai/create-canopy-agent` CLI scaffolder. Only documents the endpoints an
     SDK or CLI actually calls — dashboard/webhook routes on canopy-app are
     out of scope unless they're also exposed to API-key callers.
 
@@ -422,7 +422,7 @@ paths:
       summary: API-key validation + org context
       description: |
         Returns the org name and treasury address for the bearer key. Used by
-        `npx create-canopy-agent` to confirm the user pasted a valid key and
+        `npx @canopy-ai/create-canopy-agent` to confirm the user pasted a valid key and
         is connected to the right org before creating a policy + agent.
       responses:
         '200':
@@ -440,7 +440,7 @@ paths:
     post:
       summary: Create a policy (API-key auth)
       description: |
-        Creates a policy in the bearer key's org. Used by `create-canopy-agent`
+        Creates a policy in the bearer key's org. Used by `@canopy-ai/create-canopy-agent`
         to provision a starter-preset policy before binding it to a freshly
         created agent. `approval_required = false` means all payments under
         the spend cap auto-approve.
@@ -469,7 +469,7 @@ paths:
         Creates a Canopy agent identity bound to the org treasury. Accepts
         either a Clerk session (dashboard "Connect agent" flow) or an org
         API key (`Authorization: Bearer ak_live_...`, used by
-        `create-canopy-agent`). For API-key callers, the audit `user_id`
+        `@canopy-ai/create-canopy-agent`). For API-key callers, the audit `user_id`
         resolves to the org's first admin via Clerk.
       requestBody:
         required: true
