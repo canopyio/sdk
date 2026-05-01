@@ -82,7 +82,12 @@ async function copyTree(src: string, dest: string): Promise<void> {
   for (const entry of entries) {
     if (IGNORE.has(entry.name)) continue;
     const s = path.join(src, entry.name);
-    const d = path.join(dest, entry.name);
+    // The build-time snapshot stores the per-starter ignore as `gitignore`
+    // (see scripts/copy-templates.mjs) because npm pack strips `.gitignore`
+    // from subdirectories. Restore the dot when scaffolding into a user's
+    // project so they get a working `.gitignore` out of the box.
+    const destName = entry.name === "gitignore" ? ".gitignore" : entry.name;
+    const d = path.join(dest, destName);
     if (entry.isDirectory()) {
       await copyTree(s, d);
     } else if (entry.isFile()) {

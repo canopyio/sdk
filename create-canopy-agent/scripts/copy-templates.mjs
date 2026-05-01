@@ -29,7 +29,11 @@ async function copyTree(src, dest) {
   for (const entry of entries) {
     if (IGNORE.has(entry.name)) continue;
     const s = path.join(src, entry.name);
-    const d = path.join(dest, entry.name);
+    // npm pack strips `.gitignore` from subdirectories of published tarballs.
+    // Rename to `gitignore` in the snapshot; the runtime scaffolder restores
+    // the dot when copying into a user's project.
+    const destName = entry.name === ".gitignore" ? "gitignore" : entry.name;
+    const d = path.join(dest, destName);
     if (entry.isDirectory()) {
       await copyTree(s, d);
     } else if (entry.isFile()) {
