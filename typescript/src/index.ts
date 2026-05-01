@@ -5,6 +5,8 @@ export type {
   CanopyTool,
   DiscoverArgs,
   DiscoveredService,
+  ServicePaymentMethod,
+  ServiceEndpoint,
   PayArgs,
   PayResult,
   ApprovalStatus,

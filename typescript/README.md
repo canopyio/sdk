@@ -32,7 +32,7 @@ const canopy = new Canopy({
 });
 
 const result = await canopy.pay({
-  to: "agentic.market/anthropic",   // or a 0x… address
+  to: "0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97", // any 0x… recipient
   amountUsd: 0.10,
 });
 
@@ -57,19 +57,22 @@ switch (result.status) {
 
 ## Discover paid services at runtime
 
-Don't hardcode URLs. Let the agent find x402 services it can call:
+Don't hardcode URLs. Let the agent find paid services it can call:
 
 ```ts
 const services = await canopy.discover({ category: "data", query: "orderbook" });
-// → [{ name, description, url, payTo, typicalAmountUsd, policyAllowed, ... }]
+// → [{ slug, name, description, category, paymentMethods, endpoints,
+//     preferredBaseUrl, policyAllowed, ... }]
 
 const feed = services[0];
-if (feed?.policyAllowed) {
-  const data = await canopy.fetch(feed.url!);   // 402 → auto-paid → 200 with content
+if (feed?.policyAllowed && feed.preferredBaseUrl) {
+  const path = feed.endpoints[0]?.path ?? "/";
+  const data = await canopy.fetch(feed.preferredBaseUrl + path);
+  // 402 → auto-paid → 200 with content
 }
 ```
 
-`discover()` queries Canopy's registry of x402 services. The agent's policy filters the results — if the policy has an allowlist, only services on that list are returned. Set `includeBlocked: true` to see blocked services too (with `policyAllowed: false`).
+`discover()` queries Canopy's registry of x402-on-Base and MPP-on-Tempo services. The agent's policy filters the results by service slug — if the policy has an allowlist, only services on that list are returned. Set `includeBlocked: true` to see blocked services too (with `policyAllowed: false`). `preferredBaseUrl` is picked by treasury balance: the rail whose chain currently has positive USDC.
 
 ## Human-in-the-loop approvals
 
@@ -278,7 +281,7 @@ type PayResult =
   | { status: "denied"; reason: string; transactionId: string; };
 ```
 
-- **`to`**: a `0x…` address or a registry slug like `agentic.market/anthropic` (resolved server-side).
+- **`to`**: a `0x…` recipient address. For paid-service interactions, use `canopy.fetch(serviceUrl)` — `pay()` is for direct transfers.
 - **`amountUsd`**: USD as a number (e.g. `0.10` for ten cents).
 - **`idempotencyKey`** *(optional)*: pass a stable string for retries you don't fully control (webhooks, framework retries). Same `(agentId, idempotencyKey)` returns the cached result with `idempotent: true`.
 
@@ -301,7 +304,7 @@ Without `waitForApproval`, a payment that goes pending throws a typed error you 
 
 ### `canopy.discover(opts?)`
 
-Find x402-paywalled services the agent can call.
+Find paid services the agent can call (x402-on-Base + MPP-on-Tempo).
 
 ```ts
 const services = await canopy.discover({
@@ -311,11 +314,14 @@ const services = await canopy.discover({
   includeBlocked: false,    // include policy-blocked services with policyAllowed=false
   includeUnverified: false, // include long-tail unverified entries
 });
-// → DiscoveredService[]: { slug, name, description, url, category,
-//                          paymentProtocol, typicalAmountUsd, payTo, policyAllowed }
+// → DiscoveredService[]: { slug, name, description, category, logoUrl, docsUrl,
+//                          paymentMethods: [{ realm, baseUrl, protocol }],
+//                          endpoints: [{ method, path, description, priceAtomic,
+//                                        currency, pricingModel, protocol }],
+//                          preferredBaseUrl, policyAllowed }
 ```
 
-When the agent's policy has an allowlist, results are filtered to allowed payees by default. Pass `includeBlocked: true` to see blocked services too (each marked `policyAllowed: false`) — useful when you want the LLM to reason about why something isn't available.
+When the agent's policy has an allowlist, results are filtered to allowed services (by slug) by default. Pass `includeBlocked: true` to see blocked services too (each marked `policyAllowed: false`) — useful when you want the LLM to reason about why something isn't available. `preferredBaseUrl` is picked by treasury funding: the rail whose chain currently has positive USDC. Concatenate it with an endpoint `path` and pass the result to `canopy.fetch()`.
 
 ### `canopy.ping()`
 

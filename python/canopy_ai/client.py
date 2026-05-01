@@ -17,9 +17,8 @@ from canopy_ai.approval import (
 from canopy_ai.dashboard_urls import agents_url, api_keys_url
 from canopy_ai.discover import discover as discover_impl
 from canopy_ai.encoding import USDC_BASE, encode_erc20_transfer, is_entity_slug, usd_to_usdc_units
-from canopy_ai.errors import CanopyConfigError
+from canopy_ai.errors import CanopyConfigError, CanopyError
 from canopy_ai.fetch import canopy_fetch
-from canopy_ai.resolve import resolve_entity
 from canopy_ai.transport import Transport
 from canopy_ai.types import (
     ApprovalStatus,
@@ -105,9 +104,13 @@ class Canopy:
                 dashboard_url=url,
             )
 
-        recipient = (
-            resolve_entity(self._transport, to) if is_entity_slug(to) else to
-        )
+        if is_entity_slug(to):
+            raise CanopyError(
+                f'pay() accepts on-chain addresses only. Slug "{to}" can\'t be paid '
+                "directly — use canopy.fetch(serviceUrl) for service interactions, "
+                "or pass a 0x… address."
+            )
+        recipient = to
         amount_units = usd_to_usdc_units(amount_usd)
         chain = chain_id if chain_id is not None else _DEFAULT_CHAIN_ID
 

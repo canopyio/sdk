@@ -140,10 +140,70 @@ components:
     ResolveResponse:
       type: object
       properties:
-        address:
-          type: string
-        entity:
+        results:
           type: object
+          additionalProperties:
+            oneOf:
+              - $ref: '#/components/schemas/RegistryService'
+              - type: 'null'
+        resolvedCount:
+          type: integer
+        unresolvedCount:
+          type: integer
+
+    RegistryService:
+      type: object
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        category:
+          type: string
+        logoUrl:
+          type: string
+          nullable: true
+        docsUrl:
+          type: string
+          nullable: true
+        paymentMethods:
+          type: array
+          items:
+            type: object
+            properties:
+              realm:
+                type: string
+              baseUrl:
+                type: string
+              protocol:
+                type: string
+        endpoints:
+          type: array
+          items:
+            type: object
+            properties:
+              method:
+                type: string
+              path:
+                type: string
+              description:
+                type: string
+                nullable: true
+              priceAtomic:
+                type: string
+                nullable: true
+              currency:
+                type: string
+                nullable: true
+              pricingModel:
+                type: string
+                nullable: true
+              protocol:
+                type: string
+                nullable: true
 
     MeResponse:
       type: object
@@ -186,11 +246,12 @@ components:
           type: number
           nullable: true
           description: Single-payment threshold above which approval is required. Only enforced when `approval_required = true`.
-        allowlist_addresses:
+        allowlist_slugs:
           type: array
           items:
             type: string
           nullable: true
+          description: Allowed service slugs from the registry. The registry is the trust boundary; unknown realms at sign time are denied.
 
     CreatePolicyResponse:
       type: object
@@ -335,18 +396,22 @@ paths:
 
   /api/resolve:
     get:
-      summary: Entity registry lookup
-      description: Public lookup, no auth. Resolves a registry slug like `agentic.market/anthropic` to an address.
-      security: []
+      summary: Service registry lookup by slug
+      description: |
+        Returns the full service record (paymentMethods, endpoints, etc.) for one
+        or more registry slugs. Multiple slugs may be passed as a comma-separated
+        list. Address-based resolution was removed when the registry moved to
+        service-keyed; addresses are runtime facts now.
       parameters:
         - in: query
-          name: entity
+          name: slug
           required: true
           schema:
             type: string
+          description: One slug, or a comma-separated list.
       responses:
         '200':
-          description: Resolved entity
+          description: Resolved services
           content:
             application/json:
               schema:

@@ -253,7 +253,7 @@ async function handleX402Payment(
       type: "x402",
       chain_id: chainId,
       recipient_address: offer.payTo,
-      payload: { x402: offer, x402Version: reqs.x402Version ?? 1 },
+      payload: { x402: offer, x402Version: reqs.x402Version ?? 1, resource_url: url },
     },
     expectStatuses: [200, 202],
   });
@@ -305,7 +305,7 @@ async function handleMppPayment(
       // sending them is optional but keeps the wire shape parallel to x402.
       chain_id: challenge.request.methodDetails.chainId,
       recipient_address: challenge.request.recipient,
-      payload: { mpp_challenge: challenge },
+      payload: { mpp_challenge: challenge, resource_url: url },
     },
     expectStatuses: [200, 202],
   });

@@ -20,14 +20,31 @@ describe("canopy.discover()", () => {
         JSON.stringify({
           services: [
             {
-              slug: "agentic.market/orderbook",
+              slug: "orderbook",
               name: "Orderbook Feed",
               description: "Live order book.",
-              url: "https://orderbook.example/v1",
               category: "data",
-              paymentProtocol: "x402",
-              typicalAmountUsd: 0.01,
-              payTo: "0x" + "1".repeat(40),
+              logoUrl: null,
+              docsUrl: null,
+              paymentMethods: [
+                {
+                  realm: "orderbook.example",
+                  baseUrl: "https://orderbook.example",
+                  protocol: "x402",
+                },
+              ],
+              endpoints: [
+                {
+                  method: "GET",
+                  path: "/v1",
+                  description: null,
+                  priceAtomic: "10000",
+                  currency: "USDC",
+                  pricingModel: "fixed",
+                  protocol: "x402",
+                },
+              ],
+              preferredBaseUrl: "https://orderbook.example",
               policyAllowed: true,
             },
           ],
@@ -41,7 +58,8 @@ describe("canopy.discover()", () => {
       const result = await canopy.discover({ category: "data", query: "orderbook" });
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe("Orderbook Feed");
-      expect(result[0].url).toBe("https://orderbook.example/v1");
+      expect(result[0].preferredBaseUrl).toBe("https://orderbook.example");
+      expect(result[0].paymentMethods[0]?.protocol).toBe("x402");
       expect(result[0].policyAllowed).toBe(true);
       // Confirm the wire URL includes our filters and the auto-attached agent_id.
       expect(capturedUrl).toContain("category=data");

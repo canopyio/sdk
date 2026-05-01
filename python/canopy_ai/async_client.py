@@ -136,9 +136,13 @@ class AsyncCanopy:
                 dashboard_url=url,
             )
 
-        recipient = (
-            await self._resolve_entity(to) if is_entity_slug(to) else to
-        )
+        if is_entity_slug(to):
+            raise CanopyError(
+                f'pay() accepts on-chain addresses only. Slug "{to}" can\'t be paid '
+                "directly — use canopy.fetch(serviceUrl) for service interactions, "
+                "or pass a 0x… address."
+            )
+        recipient = to
         amount_units = usd_to_usdc_units(amount_usd)
         chain = chain_id if chain_id is not None else _DEFAULT_CHAIN_ID
 
@@ -496,7 +500,7 @@ class AsyncCanopy:
                 "type": "x402",
                 "chain_id": chain_id,
                 "recipient_address": offer["payTo"],
-                "payload": {"x402": offer, "x402Version": reqs.get("x402Version", 1)},
+                "payload": {"x402": offer, "x402Version": reqs.get("x402Version", 1), "resource_url": url},
             },
             expect_statuses=[200, 202],
         )
@@ -538,7 +542,7 @@ class AsyncCanopy:
                 "type": "mpp",
                 "chain_id": challenge["request"]["methodDetails"]["chainId"],
                 "recipient_address": challenge["request"]["recipient"],
-                "payload": {"mpp_challenge": challenge},
+                "payload": {"mpp_challenge": challenge, "resource_url": url},
             },
             expect_statuses=[200, 202],
         )
@@ -602,18 +606,6 @@ class AsyncCanopy:
         return refreshed_pick if isinstance(refreshed_pick, str) else None
 
     # ---------------------------------------------------------------- helpers
-
-    async def _resolve_entity(self, slug: str) -> str:
-        _, body = await self._request(
-            "GET",
-            f"/api/resolve?slug={quote(slug, safe='')}",
-            expect_statuses=[200],
-        )
-        assert isinstance(body, dict)
-        addr = body.get("address")
-        if not isinstance(addr, str):
-            raise CanopyError(f"resolve returned no address for {slug!r}")
-        return addr
 
     async def _request(
         self,

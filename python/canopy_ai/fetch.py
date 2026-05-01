@@ -241,7 +241,7 @@ def _retry_with_x402(
             "type": "x402",
             "chain_id": chain_id,
             "recipient_address": offer["payTo"],
-            "payload": {"x402": offer, "x402Version": reqs.get("x402Version", 1)},
+            "payload": {"x402": offer, "x402Version": reqs.get("x402Version", 1), "resource_url": url},
         },
         expect_statuses=[200, 202],
     )
@@ -291,7 +291,7 @@ def _retry_with_mpp(
             "type": "mpp",
             "chain_id": challenge["request"]["methodDetails"]["chainId"],
             "recipient_address": challenge["request"]["recipient"],
-            "payload": {"mpp_challenge": challenge},
+            "payload": {"mpp_challenge": challenge, "resource_url": url},
         },
         expect_statuses=[200, 202],
     )

@@ -23,7 +23,7 @@ const canopy = new Canopy({
 });
 
 const result = await canopy.pay({
-  to: "agentic.market/anthropic",
+  to: "0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97", // any 0x… recipient
   amountUsd: 0.10,
 });
 

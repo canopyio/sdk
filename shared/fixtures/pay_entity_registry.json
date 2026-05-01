@@ -1,6 +1,6 @@
 {
   "name": "pay_entity_registry",
-  "description": "When `to` is a registry slug, SDK resolves it via /api/resolve first, then calls /api/sign with the resolved address.",
+  "description": "When `to` is a registry slug, pay() rejects it — slug-based pay was removed when entities became service-keyed. Agents pay addresses directly or call canopy.fetch(url) for service interactions.",
   "config": {
     "apiKey": "ak_live_test",
     "agentId": "agt_test",
@@ -10,46 +10,9 @@
     "method": "pay",
     "args": { "to": "agentic.market/anthropic", "amountUsd": 0.05 }
   },
-  "httpExchange": [
-    {
-      "request": {
-        "method": "GET",
-        "url": "https://api.canopy.test/api/resolve?entity=agentic.market%2Fanthropic"
-      },
-      "response": {
-        "status": 200,
-        "body": {
-          "address": "0xa07e70707070707070707070707070707070707a",
-          "entity": { "slug": "agentic.market/anthropic", "name": "Anthropic" }
-        }
-      }
-    },
-    {
-      "request": {
-        "method": "POST",
-        "url": "https://api.canopy.test/api/sign",
-        "bodyMatches": {
-          "agent_id": "agt_test",
-          "recipient_address": "0xa07e70707070707070707070707070707070707a",
-          "amount_usd": 0.05
-        }
-      },
-      "response": {
-        "status": 200,
-        "body": {
-          "signature": null,
-          "tx_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "agent_id": "agt_test",
-          "cost_usd": "$0.0500",
-          "transaction_id": "66666666-6666-6666-6666-666666666666"
-        }
-      }
-    }
-  ],
-  "expectedReturn": {
-    "status": "allowed",
-    "txHash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "transactionId": "66666666-6666-6666-6666-666666666666",
-    "costUsd": 0.05
+  "httpExchange": [],
+  "expectedThrow": {
+    "name": "CanopyError",
+    "messageIncludes": "pay() accepts on-chain addresses only"
   }
 }

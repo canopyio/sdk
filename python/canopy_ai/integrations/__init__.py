@@ -27,8 +27,9 @@ _TOOL_SCHEMAS: list[dict[str, Any]] = [
                 "to": {
                     "type": "string",
                     "description": (
-                        "Recipient: either an `0x…` address, or an entity-registry "
-                        "slug like `agentic.market/anthropic`."
+                        "Recipient on-chain address (`0x…`). For paid-service "
+                        "interactions, use `canopy.fetch(service_url)` instead — "
+                        "`pay()` is for direct transfers."
                     ),
                 },
                 "amountUsd": {

@@ -79,6 +79,9 @@ export class CanopyApiClient {
   }
 
   async createPolicy(policy: StarterPolicy): Promise<CreatedPolicy> {
+    // Allowlist intentionally omitted — users configure allowlisted services in
+    // the Canopy dashboard so they can browse the live registry. The CLI
+    // creates the policy with no allowlist (open to any service).
     return this.request<CreatedPolicy>("POST", "/api/policies", {
       name: policy.name,
       description: policy.description,
@@ -86,7 +89,6 @@ export class CanopyApiClient {
       cap_period_hours: policy.cap_period_hours,
       approval_required: policy.approval_required,
       approval_threshold_usd: policy.approval_threshold_usd,
-      allowlist_addresses: policy.allowlist_addresses,
     });
   }
 

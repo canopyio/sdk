@@ -17,14 +17,31 @@ def _async_client_returning(handler: Any) -> httpx.AsyncClient:
 SAMPLE_BODY = {
     "services": [
         {
-            "slug": "agentic.market/orderbook",
+            "slug": "orderbook",
             "name": "Orderbook Feed",
             "description": "Live order book.",
-            "url": "https://orderbook.example/v1",
             "category": "data",
-            "paymentProtocol": "x402",
-            "typicalAmountUsd": 0.01,
-            "payTo": "0x" + "1" * 40,
+            "logoUrl": None,
+            "docsUrl": None,
+            "paymentMethods": [
+                {
+                    "realm": "orderbook.example",
+                    "baseUrl": "https://orderbook.example",
+                    "protocol": "x402",
+                }
+            ],
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/v1",
+                    "description": None,
+                    "priceAtomic": "10000",
+                    "currency": "USDC",
+                    "pricingModel": "fixed",
+                    "protocol": "x402",
+                }
+            ],
+            "preferredBaseUrl": "https://orderbook.example",
             "policyAllowed": True,
         }
     ],
@@ -48,7 +65,8 @@ class TestSyncDiscover:
         result = canopy.discover(category="data", query="orderbook")
         assert len(result) == 1
         assert result[0]["name"] == "Orderbook Feed"
-        assert result[0]["url"] == "https://orderbook.example/v1"
+        assert result[0]["preferred_base_url"] == "https://orderbook.example"
+        assert result[0]["payment_methods"][0]["protocol"] == "x402"
         assert result[0]["policy_allowed"] is True
         assert "category=data" in captured["url"]
         assert "q=orderbook" in captured["url"]

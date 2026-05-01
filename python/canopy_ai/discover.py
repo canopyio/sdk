@@ -45,11 +45,30 @@ def map_response(body: Any) -> list["DiscoveredService"]:
             "slug": s.get("slug", ""),
             "name": s.get("name", ""),
             "description": s.get("description"),
-            "url": s.get("url"),
             "category": s.get("category", ""),
-            "payment_protocol": s.get("paymentProtocol"),
-            "typical_amount_usd": s.get("typicalAmountUsd"),
-            "pay_to": s.get("payTo", ""),
+            "logo_url": s.get("logoUrl"),
+            "docs_url": s.get("docsUrl"),
+            "payment_methods": [
+                {
+                    "realm": pm.get("realm", ""),
+                    "base_url": pm.get("baseUrl", ""),
+                    "protocol": pm.get("protocol", ""),
+                }
+                for pm in (s.get("paymentMethods") or [])
+            ],
+            "endpoints": [
+                {
+                    "method": ep.get("method", ""),
+                    "path": ep.get("path", ""),
+                    "description": ep.get("description"),
+                    "price_atomic": ep.get("priceAtomic"),
+                    "currency": ep.get("currency"),
+                    "pricing_model": ep.get("pricingModel"),
+                    "protocol": ep.get("protocol"),
+                }
+                for ep in (s.get("endpoints") or [])
+            ],
+            "preferred_base_url": s.get("preferredBaseUrl"),
             "policy_allowed": bool(s.get("policyAllowed", True)),
         }
         for s in services

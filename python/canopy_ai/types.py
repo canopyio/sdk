@@ -106,18 +106,34 @@ class DiscoverArgs(TypedDict, total=False):
     limit: int
 
 
+class ServicePaymentMethod(TypedDict):
+    realm: str
+    base_url: str
+    protocol: str
+
+
+class ServiceEndpoint(TypedDict):
+    method: str
+    path: str
+    description: str | None
+    price_atomic: str | None
+    currency: str | None
+    pricing_model: str | None
+    protocol: str | None
+
+
 class DiscoveredService(TypedDict):
     slug: str
     name: str
     description: str | None
-    #: The endpoint to hit with `canopy.fetch(url)`. May be None.
-    url: str | None
     category: str
-    payment_protocol: str | None
-    #: Hint cost — actual price comes from the 402 response.
-    typical_amount_usd: float | None
-    #: On-chain payee address.
-    pay_to: str
+    logo_url: str | None
+    docs_url: str | None
+    payment_methods: list[ServicePaymentMethod]
+    endpoints: list[ServiceEndpoint]
+    #: The base URL agents should use, picked by treasury balance.
+    #: Concatenate with an endpoint `path` and pass to `canopy.fetch()`.
+    preferred_base_url: str | None
     #: False only when include_blocked=True returned a service the policy blocks.
     policy_allowed: bool
 

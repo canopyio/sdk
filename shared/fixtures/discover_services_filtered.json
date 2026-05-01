@@ -24,14 +24,31 @@
         "body": {
           "services": [
             {
-              "slug": "agentic.market/coinglass-orderbook",
+              "slug": "coinglass",
               "name": "Coinglass Orderbook Feed",
               "description": "Real-time order book depth across major exchanges.",
-              "url": "https://api.coinglass.example/v1/orderbook",
               "category": "data",
-              "paymentProtocol": "x402",
-              "typicalAmountUsd": 0.01,
-              "payTo": "0x2222222222222222222222222222222222222222",
+              "logoUrl": null,
+              "docsUrl": null,
+              "paymentMethods": [
+                {
+                  "realm": "coinglass.x402.com",
+                  "baseUrl": "https://coinglass.x402.com",
+                  "protocol": "x402"
+                }
+              ],
+              "endpoints": [
+                {
+                  "method": "GET",
+                  "path": "/v1/orderbook",
+                  "description": "Real-time order book depth.",
+                  "priceAtomic": "10000",
+                  "currency": "USDC",
+                  "pricingModel": "fixed",
+                  "protocol": "x402"
+                }
+              ],
+              "preferredBaseUrl": "https://coinglass.x402.com",
               "policyAllowed": true
             }
           ],
@@ -42,13 +59,10 @@
   ],
   "expectedReturn": [
     {
-      "slug": "agentic.market/coinglass-orderbook",
+      "slug": "coinglass",
       "name": "Coinglass Orderbook Feed",
-      "url": "https://api.coinglass.example/v1/orderbook",
       "category": "data",
-      "paymentProtocol": "x402",
-      "typicalAmountUsd": 0.01,
-      "payTo": "0x2222222222222222222222222222222222222222",
+      "preferredBaseUrl": "https://coinglass.x402.com",
       "policyAllowed": true
     }
   ]

@@ -5,7 +5,7 @@ export interface CanopyConfig {
 }
 
 export interface PayArgs {
-  /** Recipient: either an `0x…` address or an entity-registry slug like `agentic.market/anthropic`. */
+  /** Recipient on-chain address (`0x…`). For paid-service interactions, use `canopy.fetch(serviceUrl)` instead — `pay()` is for direct transfers. */
   to: string;
   /** Amount in USD. Policy engine enforces caps and approval thresholds against this. */
   amountUsd: number;
@@ -119,18 +119,43 @@ export interface DiscoverArgs {
   limit?: number;
 }
 
+export interface ServicePaymentMethod {
+  /** Hostname of the service gateway, e.g. `"openai.mpp.tempo.xyz"`. */
+  realm: string;
+  /** Base URL the SDK can `fetch()` against. */
+  baseUrl: string;
+  /** `"x402"` or `"mpp-tempo"`. */
+  protocol: string;
+}
+
+export interface ServiceEndpoint {
+  method: string;
+  path: string;
+  description: string | null;
+  /** Atomic units of `currency`. Null when price is dynamic. */
+  priceAtomic: string | null;
+  currency: string | null;
+  pricingModel: string | null;
+  /** Which rail this endpoint is on; null when the service is single-rail. */
+  protocol: string | null;
+}
+
 export interface DiscoveredService {
+  /** Canonical service identifier, e.g. `"openai"`. Stable across re-seeds. */
   slug: string;
   name: string;
   description: string | null;
-  /** The endpoint to hit with `canopy.fetch(url)`. May be `null` for entries without a known URL. */
-  url: string | null;
   category: string;
-  paymentProtocol: string | null;
-  /** Hint cost — actual price comes from the 402 response. */
-  typicalAmountUsd: number | null;
-  /** On-chain `payTo` address. */
-  payTo: string;
+  logoUrl: string | null;
+  docsUrl: string | null;
+  paymentMethods: ServicePaymentMethod[];
+  endpoints: ServiceEndpoint[];
+  /**
+   * The base URL agents should use, picked by treasury balance among
+   * `paymentMethods`. Concatenate with an endpoint `path` to construct the
+   * URL passed to `canopy.fetch()`. `null` when no rail is funded.
+   */
+  preferredBaseUrl: string | null;
   /** False only when `includeBlocked: true` returned a service the policy blocks. */
   policyAllowed: boolean;
 }

@@ -28,7 +28,7 @@ export function getTools(canopy: Canopy): CanopyTool[] {
           to: {
             type: "string",
             description:
-              "Recipient: either an `0x…` address, or an entity-registry slug like `agentic.market/anthropic`.",
+              "Recipient on-chain address (`0x…`). For paid-service interactions, use `canopy.fetch(serviceUrl)` instead — `pay()` is for direct transfers.",
           },
           amountUsd: {
             type: "number",

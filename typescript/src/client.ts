@@ -16,7 +16,7 @@ import { Transport } from "./transport.js";
 import { CanopyConfigError } from "./errors.js";
 import { agentsUrl, apiKeysUrl } from "./dashboard-urls.js";
 import { encodeErc20Transfer, isEntitySlug, USDC_BASE, usdToUsdcUnits } from "./encoding.js";
-import { resolveEntity } from "./resolve.js";
+import { CanopyError } from "./errors.js";
 import {
   approve as approveImpl,
   deny as denyImpl,
@@ -105,9 +105,13 @@ export class Canopy {
       );
     }
 
-    const recipientAddress = isEntitySlug(args.to)
-      ? await resolveEntity(this.transport, args.to)
-      : args.to;
+    if (isEntitySlug(args.to)) {
+      throw new CanopyError(
+        `pay() accepts on-chain addresses only. Slug "${args.to}" can't be paid directly — ` +
+          `use canopy.fetch(serviceUrl) for service interactions, or pass a 0x… address.`,
+      );
+    }
+    const recipientAddress = args.to;
 
     const amountUnits = usdToUsdcUnits(args.amountUsd);
     const chainId = args.chainId ?? DEFAULT_CHAIN_ID;

@@ -173,6 +173,9 @@ async function main(): Promise<void> {
   console.log(`   ${bold("npm start")}`);
   console.log("");
   info(`Edit your policy or pause the agent at:\n   https://trycanopy.ai/dashboard/agents/${agentId}`);
+  info(
+    `To restrict which services this agent can pay (allowlist), browse the\n   registry and pick services in the policy editor in the dashboard.`,
+  );
   if (!anthropicKey) {
     warn(
       `Don't forget to set ANTHROPIC_API_KEY in ${path.join(projectName, ".env")} before \`npm start\`.`,
@@ -187,17 +190,15 @@ function shortenAddress(addr: string): string {
 
 function printPolicyTable(starter: StarterDef): void {
   const p = starter.policy;
-  const allowlist =
-    p.allowlist_addresses.length === 0
-      ? "(empty — configure in dashboard before going past testing)"
-      : p.allowlist_addresses.join(", ");
   console.log(`   • Spend cap            $${p.spend_cap_usd} / ${p.cap_period_hours}h`);
   if (p.approval_required && p.approval_threshold_usd != null) {
     console.log(`   • Approval threshold   $${p.approval_threshold_usd} single payment`);
   } else {
     console.log(`   • Approval threshold   none — all payments under cap auto-approve`);
   }
-  console.log(`   • Allowlist            ${allowlist}`);
+  console.log(
+    `   • Allowlisted services configure in dashboard → https://trycanopy.ai/dashboard`,
+  );
 }
 
 async function pickApproval(starter: StarterDef): Promise<ApprovalChoice> {

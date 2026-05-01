@@ -21,25 +21,39 @@
         "body": {
           "services": [
             {
-              "slug": "agentic.market/allowed-feed",
+              "slug": "allowed-feed",
               "name": "Allowed Feed",
               "description": "On the agent's allowlist.",
-              "url": "https://allowed.example/v1",
               "category": "data",
-              "paymentProtocol": "x402",
-              "typicalAmountUsd": 0.005,
-              "payTo": "0x1111111111111111111111111111111111111111",
+              "logoUrl": null,
+              "docsUrl": null,
+              "paymentMethods": [
+                {
+                  "realm": "allowed.example",
+                  "baseUrl": "https://allowed.example",
+                  "protocol": "x402"
+                }
+              ],
+              "endpoints": [],
+              "preferredBaseUrl": "https://allowed.example",
               "policyAllowed": true
             },
             {
-              "slug": "agentic.market/blocked-feed",
+              "slug": "blocked-feed",
               "name": "Blocked Feed",
               "description": "Policy-blocked; returned because include_blocked=true.",
-              "url": "https://blocked.example/v1",
               "category": "data",
-              "paymentProtocol": "x402",
-              "typicalAmountUsd": 0.05,
-              "payTo": "0x9999999999999999999999999999999999999999",
+              "logoUrl": null,
+              "docsUrl": null,
+              "paymentMethods": [
+                {
+                  "realm": "blocked.example",
+                  "baseUrl": "https://blocked.example",
+                  "protocol": "x402"
+                }
+              ],
+              "endpoints": [],
+              "preferredBaseUrl": "https://blocked.example",
               "policyAllowed": false
             }
           ],

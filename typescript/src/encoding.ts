@@ -33,7 +33,9 @@ export function usdToUsdcUnits(usd: number): bigint {
   return BigInt(whole + fractionPadded);
 }
 
-/** Scans for entity-registry slugs. Anything not matching this is treated as a 0x address. */
+/** True when `to` doesn't look like a 0x address. Used by `pay()` to reject
+ * slug-shaped input with a helpful error pointing users at `canopy.fetch()`
+ * for service interactions. */
 export function isEntitySlug(to: string): boolean {
   return !/^0x[0-9a-fA-F]{40}$/.test(to);
 }

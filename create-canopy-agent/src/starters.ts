@@ -5,7 +5,8 @@ export interface StarterPolicy {
   cap_period_hours: number;
   approval_required: boolean;
   approval_threshold_usd: number | null;
-  allowlist_addresses: string[];
+  // Allowlisted services are intentionally NOT scaffolded by the CLI — they're
+  // managed in the Canopy dashboard so users can browse the live registry.
 }
 
 export interface StarterDef {
@@ -29,7 +30,6 @@ export const STARTERS: StarterDef[] = [
       cap_period_hours: 24,
       approval_required: true,
       approval_threshold_usd: 5,
-      allowlist_addresses: [],
     },
     recommendedFirst: true,
   },
@@ -44,7 +44,6 @@ export const STARTERS: StarterDef[] = [
       cap_period_hours: 24,
       approval_required: true,
       approval_threshold_usd: 0.5,
-      allowlist_addresses: [],
     },
   },
   {
@@ -58,7 +57,6 @@ export const STARTERS: StarterDef[] = [
       cap_period_hours: 24,
       approval_required: true,
       approval_threshold_usd: 0.5,
-      allowlist_addresses: [],
     },
   },
   {
@@ -72,7 +70,6 @@ export const STARTERS: StarterDef[] = [
       cap_period_hours: 24,
       approval_required: true,
       approval_threshold_usd: 2,
-      allowlist_addresses: [],
     },
   },
   {
@@ -86,7 +83,6 @@ export const STARTERS: StarterDef[] = [
       cap_period_hours: 24,
       approval_required: true,
       approval_threshold_usd: 3,
-      allowlist_addresses: [],
     },
   },
   {
@@ -100,7 +96,6 @@ export const STARTERS: StarterDef[] = [
       cap_period_hours: 24,
       approval_required: true,
       approval_threshold_usd: 25,
-      allowlist_addresses: [],
     },
   },
 ];

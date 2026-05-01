@@ -1,16 +1,22 @@
 import type { Transport } from "./transport.js";
-import type { DiscoverArgs, DiscoveredService } from "./types.js";
+import type {
+  DiscoverArgs,
+  DiscoveredService,
+  ServiceEndpoint,
+  ServicePaymentMethod,
+} from "./types.js";
 
 interface DiscoverResponse {
   services: Array<{
     slug: string;
     name: string;
     description: string | null;
-    url: string | null;
     category: string;
-    paymentProtocol: string | null;
-    typicalAmountUsd: number | null;
-    payTo: string;
+    logoUrl: string | null;
+    docsUrl: string | null;
+    paymentMethods: ServicePaymentMethod[];
+    endpoints: ServiceEndpoint[];
+    preferredBaseUrl: string | null;
     policyAllowed: boolean;
   }>;
   count: number;
@@ -19,8 +25,12 @@ interface DiscoverResponse {
 /**
  * Calls `GET /api/services` and returns the parsed list. The caller (the
  * `Canopy` client) supplies `agent_id` so the backend can apply policy-aware
- * filtering: services not on the agent's allowlist are filtered out by
+ * filtering: services not on the agent's slug allowlist are filtered out by
  * default (or marked `policyAllowed: false` when `includeBlocked: true`).
+ *
+ * Each service's `preferredBaseUrl` is picked by treasury funding — the rail
+ * whose chain has positive USDC. Use `fetch(preferredBaseUrl + endpoint.path)`
+ * to call a service.
  */
 export async function discover(
   transport: Transport,
@@ -49,11 +59,12 @@ export async function discover(
     slug: s.slug,
     name: s.name,
     description: s.description,
-    url: s.url,
     category: s.category,
-    paymentProtocol: s.paymentProtocol,
-    typicalAmountUsd: s.typicalAmountUsd,
-    payTo: s.payTo,
+    logoUrl: s.logoUrl,
+    docsUrl: s.docsUrl,
+    paymentMethods: s.paymentMethods,
+    endpoints: s.endpoints,
+    preferredBaseUrl: s.preferredBaseUrl,
     policyAllowed: s.policyAllowed,
   }));
 }

@@ -32,7 +32,7 @@ canopy = Canopy(
     agent_id=os.environ["CANOPY_AGENT_ID"],
 )
 
-result = canopy.pay(to="agentic.market/anthropic", amount_usd=0.10)
+result = canopy.pay(to="0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97", amount_usd=0.10)
 
 if result["status"] == "allowed":
     print("paid:", result["tx_hash"])
@@ -70,19 +70,21 @@ asyncio.run(main())
 
 ## Discover paid services at runtime
 
-Don't hardcode URLs. Let the agent find x402 services it can call:
+Don't hardcode URLs. Let the agent find paid services it can call:
 
 ```python
 services = canopy.discover(category="data", query="orderbook")
-# → [{ "name", "description", "url", "pay_to", "typical_amount_usd",
-#      "policy_allowed", ... }]
+# → [{ "slug", "name", "description", "category", "payment_methods",
+#      "endpoints", "preferred_base_url", "policy_allowed", ... }]
 
 feed = services[0]
-if feed["policy_allowed"] and feed["url"]:
-    res = canopy.fetch(feed["url"])   # 402 → auto-paid → 200 with content
+if feed["policy_allowed"] and feed["preferred_base_url"]:
+    path = feed["endpoints"][0]["path"] if feed["endpoints"] else "/"
+    res = canopy.fetch(feed["preferred_base_url"] + path)
+    # 402 → auto-paid → 200 with content
 ```
 
-`discover()` queries Canopy's registry of x402 services. The agent's policy filters the results — if the policy has an allowlist, only services on that list are returned. Pass `include_blocked=True` to see blocked services too (with `policy_allowed: False`).
+`discover()` queries Canopy's registry of x402-on-Base and MPP-on-Tempo services. The agent's policy filters the results by service slug — if the policy has an allowlist, only services on that list are returned. Pass `include_blocked=True` to see blocked services too (with `policy_allowed: False`). `preferred_base_url` is picked by treasury balance: the rail whose chain currently has positive USDC.
 
 ## Human-in-the-loop approvals
 
@@ -301,7 +303,7 @@ Returns a `TypedDict` discriminated on `status`:
 {"status": "denied", "reason": str, "transaction_id": str}
 ```
 
-- **`to`**: a `0x…` address or a registry slug like `"agentic.market/anthropic"`.
+- **`to`**: a `0x…` recipient address. For paid-service interactions, use `canopy.fetch(service_url)` — `pay()` is for direct transfers.
 - **`idempotency_key`** *(optional)*: stable string for retries you don't fully control (webhook handlers, framework retries). Subsequent calls with the same key on the same agent return the cached result without re-charging.
 
 ### `canopy.preview(...)`
@@ -324,7 +326,7 @@ Without `wait_for_approval`, a payment that goes pending raises a typed exceptio
 
 ### `canopy.discover(**kwargs)`
 
-Find x402-paywalled services the agent can call.
+Find paid services the agent can call (x402-on-Base + MPP-on-Tempo).
 
 ```python
 services = canopy.discover(
@@ -335,11 +337,14 @@ services = canopy.discover(
     include_unverified=False, # include long-tail unverified entries
 )
 # → list[DiscoveredService]
-#   { "slug", "name", "description", "url", "category",
-#     "payment_protocol", "typical_amount_usd", "pay_to", "policy_allowed" }
+#   { "slug", "name", "description", "category", "logo_url", "docs_url",
+#     "payment_methods": [{ "realm", "base_url", "protocol" }],
+#     "endpoints": [{ "method", "path", "description", "price_atomic",
+#                     "currency", "pricing_model", "protocol" }],
+#     "preferred_base_url", "policy_allowed" }
 ```
 
-When the agent's policy has an allowlist, results are filtered to allowed payees by default. Pass `include_blocked=True` to see blocked services too — useful when you want the LLM to reason about why something isn't available.
+When the agent's policy has an allowlist, results are filtered to allowed services (by slug) by default. Pass `include_blocked=True` to see blocked services too — useful when you want the LLM to reason about why something isn't available. `preferred_base_url` is picked by treasury funding: the rail whose chain currently has positive USDC. Concatenate it with an endpoint `path` and pass the result to `canopy.fetch()`.
 
 ### `canopy.ping()`
 
